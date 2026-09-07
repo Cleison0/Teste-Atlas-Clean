@@ -9,6 +9,8 @@ import { AdicionarItemCarrinhoUseCase } from '../application/adicionar-item-carr
 import { AtualizarQuantidadeItemCarrinhoUseCase } from '../application/atualizar-quantidade-item-carrinho.use-case';
 import { RemoverItemCarrinhoUseCase } from '../application/remover-item-carrinho.use-case';
 import { LimparCarrinhoUseCase } from '../application/limpar-carrinho.use-case';
+import { AplicarCupomCarrinhoUseCase } from '../application/aplicar-cupom-carrinho.use-case';
+import { RemoverCupomCarrinhoUseCase } from '../application/remover-cupom-carrinho.use-case';
 import { CarrinhoSessaoRepository } from '../domain/carrinho-sessao.repository';
 import { PrismaCarrinhoSessaoRepository } from './prisma-carrinho-sessao.repository';
 import { LimpezaCarrinhosScheduler } from './limpeza-carrinhos.scheduler';
@@ -25,6 +27,8 @@ import { LimpezaCarrinhosScheduler } from './limpeza-carrinhos.scheduler';
     AtualizarQuantidadeItemCarrinhoUseCase,
     RemoverItemCarrinhoUseCase,
     LimparCarrinhoUseCase,
+    AplicarCupomCarrinhoUseCase,
+    RemoverCupomCarrinhoUseCase,
     LimpezaCarrinhosScheduler,
   ],
   exports: [MontarCarrinhoUseCase],

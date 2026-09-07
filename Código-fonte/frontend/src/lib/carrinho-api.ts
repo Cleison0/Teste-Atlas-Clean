@@ -26,6 +26,10 @@ export interface CarrinhoServidor {
   itens: ItemCarrinhoServidor[];
   itensIndisponiveis: ItemCarrinhoIndisponivel[];
   total: number;
+  /** 0 quando nenhum cupom válido está aplicado. */
+  desconto: number;
+  totalComDesconto: number;
+  cupomCodigo?: string;
 }
 
 // Envia sessionToken (se houver carrinho anônimo local) e Authorization (se houver
@@ -88,4 +92,14 @@ export function removerItemCarrinho(produtoId: string): Promise<CarrinhoServidor
 
 export function limparCarrinhoServidor(): Promise<CarrinhoServidor> {
   return chamar(api.delete<CarrinhoServidor>('/carrinho', { headers: headersDaSessao() }));
+}
+
+export function aplicarCupomCarrinho(cupomCodigo: string): Promise<CarrinhoServidor> {
+  return chamar(
+    api.post<CarrinhoServidor>('/carrinho/cupom', { cupomCodigo }, { headers: headersDaSessao() }),
+  );
+}
+
+export function removerCupomCarrinho(): Promise<CarrinhoServidor> {
+  return chamar(api.delete<CarrinhoServidor>('/carrinho/cupom', { headers: headersDaSessao() }));
 }

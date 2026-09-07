@@ -6,6 +6,22 @@ import { ResolverCarrinhoSessaoUseCase } from './resolver-carrinho-sessao.use-ca
 import { ProdutoRepository } from '../../produtos/domain/produto.repository';
 import { Produto } from '../../produtos/domain/produto.entity';
 import { CarrinhoSessao, ItemCarrinhoSessao } from '../domain/carrinho-sessao';
+import { CupomRepository } from '../../cupons/domain/cupom.repository';
+import { Cupom } from '../../cupons/domain/cupom.entity';
+
+function criarCupom(overrides: Partial<Cupom> = {}): Cupom {
+  return new Cupom(
+    overrides.id ?? 'cupom-1',
+    overrides.codigo ?? 'DESCONTO10',
+    overrides.tipoDesconto ?? 'PERCENTUAL',
+    overrides.valor ?? 10,
+    overrides.ativo ?? true,
+    overrides.usosCount ?? 0,
+    overrides.createdAt ?? new Date(),
+    overrides.validoAte,
+    overrides.usoMaximo,
+  );
+}
 
 function criarProduto(overrides: Partial<Produto> = {}): Produto {
   return new Produto(
@@ -21,6 +37,7 @@ function criarProduto(overrides: Partial<Produto> = {}): Produto {
 describe('VisualizarCarrinhoUseCase', () => {
   let resolverCarrinhoSessaoUseCase: jest.Mocked<ResolverCarrinhoSessaoUseCase>;
   let produtoRepository: jest.Mocked<ProdutoRepository>;
+  let cupomRepository: jest.Mocked<CupomRepository>;
   let useCase: VisualizarCarrinhoUseCase;
 
   beforeEach(() => {
@@ -32,7 +49,15 @@ describe('VisualizarCarrinhoUseCase', () => {
       buscarPorIds: jest.fn(),
     } as unknown as jest.Mocked<ProdutoRepository>;
 
-    useCase = new VisualizarCarrinhoUseCase(resolverCarrinhoSessaoUseCase, produtoRepository);
+    cupomRepository = {
+      buscarPorCodigo: jest.fn(),
+    } as unknown as jest.Mocked<CupomRepository>;
+
+    useCase = new VisualizarCarrinhoUseCase(
+      resolverCarrinhoSessaoUseCase,
+      produtoRepository,
+      cupomRepository,
+    );
   });
 
   it('devolve carrinho vazio sem tocar o repositório de produtos quando nada é encontrado', async () => {
@@ -48,6 +73,9 @@ describe('VisualizarCarrinhoUseCase', () => {
       itens: [],
       itensIndisponiveis: [],
       total: 0,
+      desconto: 0,
+      totalComDesconto: 0,
+      cupomCodigo: undefined,
     });
     expect(produtoRepository.buscarPorIds).not.toHaveBeenCalled();
     expect(resolverCarrinhoSessaoUseCase.executar).toHaveBeenCalledWith(
@@ -193,5 +221,69 @@ describe('VisualizarCarrinhoUseCase', () => {
     const resultado = await useCase.executar('token-existente', undefined);
 
     expect(resultado.sessionToken).toBe('token-existente');
+  });
+
+  describe('cupom', () => {
+    it('aplica desconto do cupom salvo no carrinho, se ainda for válido', async () => {
+      resolverCarrinhoSessaoUseCase.executar.mockResolvedValue({
+        carrinho: new CarrinhoSessao(
+          'carrinho-1',
+          'token-1',
+          undefined,
+          [new ItemCarrinhoSessao('produto-1', 2)],
+          undefined,
+          'DESCONTO10',
+        ),
+        sessionTokenNovo: undefined,
+      });
+      produtoRepository.buscarPorIds.mockResolvedValue([criarProduto({ preco: 10 })]);
+      cupomRepository.buscarPorCodigo.mockResolvedValue(criarCupom());
+
+      const resultado = await useCase.executar('token-1', undefined);
+
+      expect(resultado.total).toBe(20);
+      expect(resultado.desconto).toBe(2);
+      expect(resultado.totalComDesconto).toBe(18);
+      expect(resultado.cupomCodigo).toBe('DESCONTO10');
+    });
+
+    it('cupom salvo mas expirado não aplica desconto (sem lançar erro)', async () => {
+      resolverCarrinhoSessaoUseCase.executar.mockResolvedValue({
+        carrinho: new CarrinhoSessao(
+          'carrinho-1',
+          'token-1',
+          undefined,
+          [new ItemCarrinhoSessao('produto-1', 2)],
+          undefined,
+          'DESCONTO10',
+        ),
+        sessionTokenNovo: undefined,
+      });
+      produtoRepository.buscarPorIds.mockResolvedValue([criarProduto({ preco: 10 })]);
+      cupomRepository.buscarPorCodigo.mockResolvedValue(
+        criarCupom({ validoAte: new Date('2020-01-01') }),
+      );
+
+      const resultado = await useCase.executar('token-1', undefined);
+
+      expect(resultado.desconto).toBe(0);
+      expect(resultado.totalComDesconto).toBe(20);
+      expect(resultado.cupomCodigo).toBeUndefined();
+    });
+
+    it('sem cupom salvo, desconto fica 0 sem consultar CupomRepository', async () => {
+      resolverCarrinhoSessaoUseCase.executar.mockResolvedValue({
+        carrinho: new CarrinhoSessao('carrinho-1', 'token-1', undefined, [
+          new ItemCarrinhoSessao('produto-1', 2),
+        ]),
+        sessionTokenNovo: undefined,
+      });
+      produtoRepository.buscarPorIds.mockResolvedValue([criarProduto({ preco: 10 })]);
+
+      const resultado = await useCase.executar('token-1', undefined);
+
+      expect(resultado.desconto).toBe(0);
+      expect(cupomRepository.buscarPorCodigo).not.toHaveBeenCalled();
+    });
   });
 });

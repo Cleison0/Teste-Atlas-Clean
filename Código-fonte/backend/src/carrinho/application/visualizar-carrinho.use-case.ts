@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ResolverCarrinhoSessaoUseCase } from './resolver-carrinho-sessao.use-case';
 import { ProdutoRepository } from '../../produtos/domain/produto.repository';
+import { CupomRepository } from '../../cupons/domain/cupom.repository';
 
 export interface ItemCarrinhoVisualizado {
   produtoId: string;
@@ -28,6 +29,13 @@ export interface ResultadoVisualizacaoCarrinho {
   itens: ItemCarrinhoVisualizado[];
   itensIndisponiveis: ItemCarrinhoIndisponivel[];
   total: number;
+  /** 0 quando nenhum cupom válido está aplicado. */
+  desconto: number;
+  totalComDesconto: number;
+  /** Só preenchido quando o cupom salvo no carrinho ainda é válido — ver
+   * Cupom.estaValido(). Um código salvo mas expirado/esgotado some daqui (sem
+   * limpar o campo no banco, só não aplica desconto). */
+  cupomCodigo: string | undefined;
 }
 
 const VAZIO: ResultadoVisualizacaoCarrinho = {
@@ -35,6 +43,9 @@ const VAZIO: ResultadoVisualizacaoCarrinho = {
   itens: [],
   itensIndisponiveis: [],
   total: 0,
+  desconto: 0,
+  totalComDesconto: 0,
+  cupomCodigo: undefined,
 };
 
 /**
@@ -48,6 +59,7 @@ export class VisualizarCarrinhoUseCase {
   constructor(
     private readonly resolverCarrinhoSessaoUseCase: ResolverCarrinhoSessaoUseCase,
     private readonly produtoRepository: ProdutoRepository,
+    private readonly cupomRepository: CupomRepository,
   ) {}
 
   async executar(
@@ -105,6 +117,24 @@ export class VisualizarCarrinhoUseCase {
 
     const total = Number(itens.reduce((soma, item) => soma + item.subtotal, 0).toFixed(2));
 
-    return { sessionToken: carrinho.sessionToken, itens, itensIndisponiveis, total };
+    let desconto = 0;
+    let cupomCodigo: string | undefined;
+    if (carrinho.cupomCodigo) {
+      const cupom = await this.cupomRepository.buscarPorCodigo(carrinho.cupomCodigo);
+      if (cupom && cupom.estaValido()) {
+        desconto = cupom.calcularDesconto(total);
+        cupomCodigo = cupom.codigo;
+      }
+    }
+
+    return {
+      sessionToken: carrinho.sessionToken,
+      itens,
+      itensIndisponiveis,
+      total,
+      desconto,
+      totalComDesconto: Number((total - desconto).toFixed(2)),
+      cupomCodigo,
+    };
   }
 }

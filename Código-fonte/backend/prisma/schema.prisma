@@ -296,7 +296,8 @@ model Cupom {
   usosCount    Int          @default(0) @map("usos_count")
   createdAt    DateTime     @default(now()) @map("created_at")
 
-  pedidos Pedido[]
+  pedidos   Pedido[]
+  carrinhos Carrinho[]
 
   @@map("cupons")
 }
@@ -328,11 +329,17 @@ model Carrinho {
   id           String    @id @default(uuid())
   clienteId    String?   @map("cliente_id")
   sessionToken String    @unique @map("session_token")
+  // Cupom aplicado ao carrinho (opcional) — validade/uso máximo são reconferidos a
+  // cada leitura (VisualizarCarrinhoUseCase), nunca confiar em "foi válido quando
+  // aplicado". Se o cupom deixar de valer nesse meio tempo, a leitura simplesmente
+  // não aplica desconto (não limpa este campo sozinha).
+  cupomCodigo  String?   @map("cupom_codigo")
   expiraEm     DateTime? @map("expira_em")
   createdAt    DateTime  @default(now()) @map("created_at")
   updatedAt    DateTime  @updatedAt @map("updated_at")
 
   cliente Cliente?       @relation(fields: [clienteId], references: [id])
+  cupom   Cupom?         @relation(fields: [cupomCodigo], references: [codigo])
   itens   ItemCarrinho[]
 
   @@index([clienteId])

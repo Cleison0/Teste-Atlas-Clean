@@ -1,6 +1,7 @@
 // Testes e2e do carrinho persistido: sessão anônima via header X-Cart-Session,
 // continuidade pra cliente logado (mesmo carrinho entre "dispositivos" via
-// Authorization), adoção do carrinho anônimo ao logar, e disponibilidade na leitura.
+// Authorization), adoção/merge do carrinho anônimo ao logar, cupom de desconto
+// aplicado ao carrinho, e disponibilidade na leitura.
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Test, TestingModule } from '@nestjs/testing';
@@ -72,6 +73,14 @@ describe('Carrinho (e2e)', () => {
       { expiresIn: '1h' },
     );
     return { clienteId: cliente.id, accessToken };
+  }
+
+  async function criarCupom(overrides: Record<string, unknown> = {}) {
+    const codigo = `cupom${randomUUID().slice(0, 8)}`;
+    const cupom = await prisma.cupom.create({
+      data: { codigo: codigo.toUpperCase(), tipoDesconto: 'PERCENTUAL', valor: 10, ...overrides },
+    });
+    return cupom.codigo;
   }
 
   it('GET /carrinho sem token nenhum devolve carrinho vazio sem criar linha no banco', async () => {
@@ -227,6 +236,53 @@ describe('Carrinho (e2e)', () => {
     expect(carrinhoNoBanco?.clienteId).toBe(cliente.clienteId);
   });
 
+  it('cliente já tem carrinho e loga com carrinho anônimo diferente: quantidades somam (merge), anônimo fica vazio', async () => {
+    const produtoComum = await criarProdutoComEstoque(10);
+    const produtoSoNoAnonimo = await criarProdutoComEstoque(10);
+    const cliente = await criarClienteComToken();
+
+    // Cliente já compra antes, de um "dispositivo" onde já está logado.
+    await request(app.getHttpServer())
+      .post('/carrinho/itens')
+      .set('Authorization', `Bearer ${cliente.accessToken}`)
+      .send({ produtoId: produtoComum.id, quantidade: 1 })
+      .expect(201);
+
+    // Em outro navegador, sem estar logado, adiciona itens (carrinho anônimo com
+    // token diferente do carrinho do cliente).
+    const anonimo = await request(app.getHttpServer())
+      .post('/carrinho/itens')
+      .send({ produtoId: produtoComum.id, quantidade: 2 })
+      .expect(201);
+    const sessionTokenAnonimo = anonimo.body.sessionToken as string;
+    await request(app.getHttpServer())
+      .post('/carrinho/itens')
+      .set('X-Cart-Session', sessionTokenAnonimo)
+      .send({ produtoId: produtoSoNoAnonimo.id, quantidade: 5 })
+      .expect(201);
+
+    // Loga nesse navegador — manda os dois: o token anônimo local E o Bearer.
+    const aposLogar = await request(app.getHttpServer())
+      .get('/carrinho')
+      .set('X-Cart-Session', sessionTokenAnonimo)
+      .set('Authorization', `Bearer ${cliente.accessToken}`)
+      .expect(200);
+
+    expect(aposLogar.body.itens).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ produtoId: produtoComum.id, quantidade: 3 }),
+        expect.objectContaining({ produtoId: produtoSoNoAnonimo.id, quantidade: 5 }),
+      ]),
+    );
+    expect(aposLogar.body.itens).toHaveLength(2);
+
+    const carrinhoAnonimoNoBanco = await prisma.carrinho.findUnique({
+      where: { sessionToken: sessionTokenAnonimo },
+      include: { itens: true },
+    });
+    expect(carrinhoAnonimoNoBanco?.itens).toHaveLength(0);
+  });
+
   it('produto desativado depois de adicionado aparece em itensIndisponiveis, sem sumir do banco', async () => {
     const produto = await criarProdutoComEstoque(10);
     const criado = await request(app.getHttpServer())
@@ -249,5 +305,115 @@ describe('Carrinho (e2e)', () => {
 
     const itemNoBanco = await prisma.itemCarrinho.findFirst({ where: { produtoId: produto.id } });
     expect(itemNoBanco).not.toBeNull();
+  });
+
+  describe('cupom no carrinho', () => {
+    it('POST /carrinho/cupom aplica desconto, refletido em GET /carrinho', async () => {
+      const produto = await criarProdutoComEstoque(10);
+      const codigo = await criarCupom({ tipoDesconto: 'PERCENTUAL', valor: 10 });
+      const criado = await request(app.getHttpServer())
+        .post('/carrinho/itens')
+        .send({ produtoId: produto.id, quantidade: 1 })
+        .expect(201);
+      const sessionToken = criado.body.sessionToken as string;
+
+      const aposAplicar = await request(app.getHttpServer())
+        .post('/carrinho/cupom')
+        .set('X-Cart-Session', sessionToken)
+        .send({ cupomCodigo: codigo })
+        .expect(201);
+
+      expect(aposAplicar.body.cupomCodigo).toBe(codigo);
+      expect(aposAplicar.body.desconto).toBe(1);
+      expect(aposAplicar.body.totalComDesconto).toBe(9);
+
+      // Persiste — uma nova leitura, sem reaplicar nada, continua mostrando o desconto.
+      const leitura = await request(app.getHttpServer())
+        .get('/carrinho')
+        .set('X-Cart-Session', sessionToken)
+        .expect(200);
+      expect(leitura.body.cupomCodigo).toBe(codigo);
+      expect(leitura.body.desconto).toBe(1);
+    });
+
+    it('POST /carrinho/cupom rejeita cupom inexistente com 409, sem aplicar nada', async () => {
+      const produto = await criarProdutoComEstoque(10);
+      const criado = await request(app.getHttpServer())
+        .post('/carrinho/itens')
+        .send({ produtoId: produto.id, quantidade: 1 })
+        .expect(201);
+      const sessionToken = criado.body.sessionToken as string;
+
+      await request(app.getHttpServer())
+        .post('/carrinho/cupom')
+        .set('X-Cart-Session', sessionToken)
+        .send({ cupomCodigo: 'INEXISTENTE' })
+        .expect(409);
+
+      const leitura = await request(app.getHttpServer())
+        .get('/carrinho')
+        .set('X-Cart-Session', sessionToken)
+        .expect(200);
+      expect(leitura.body.cupomCodigo).toBeUndefined();
+      expect(leitura.body.desconto).toBe(0);
+    });
+
+    it('POST /carrinho/cupom num carrinho vazio/inexistente devolve 400 (CARRINHO_VAZIO)', async () => {
+      const codigo = await criarCupom();
+
+      await request(app.getHttpServer())
+        .post('/carrinho/cupom')
+        .send({ cupomCodigo: codigo })
+        .expect(400);
+    });
+
+    it('DELETE /carrinho/cupom remove o desconto aplicado', async () => {
+      const produto = await criarProdutoComEstoque(10);
+      const codigo = await criarCupom();
+      const criado = await request(app.getHttpServer())
+        .post('/carrinho/itens')
+        .send({ produtoId: produto.id, quantidade: 1 })
+        .expect(201);
+      const sessionToken = criado.body.sessionToken as string;
+      await request(app.getHttpServer())
+        .post('/carrinho/cupom')
+        .set('X-Cart-Session', sessionToken)
+        .send({ cupomCodigo: codigo })
+        .expect(201);
+
+      const aposRemover = await request(app.getHttpServer())
+        .delete('/carrinho/cupom')
+        .set('X-Cart-Session', sessionToken)
+        .expect(200);
+
+      expect(aposRemover.body.cupomCodigo).toBeUndefined();
+      expect(aposRemover.body.desconto).toBe(0);
+      expect(aposRemover.body.totalComDesconto).toBe(aposRemover.body.total);
+    });
+
+    it('cupom que expira depois de aplicado deixa de aplicar desconto na próxima leitura, sem erro', async () => {
+      const produto = await criarProdutoComEstoque(10);
+      const codigo = await criarCupom();
+      const criado = await request(app.getHttpServer())
+        .post('/carrinho/itens')
+        .send({ produtoId: produto.id, quantidade: 1 })
+        .expect(201);
+      const sessionToken = criado.body.sessionToken as string;
+      await request(app.getHttpServer())
+        .post('/carrinho/cupom')
+        .set('X-Cart-Session', sessionToken)
+        .send({ cupomCodigo: codigo })
+        .expect(201);
+
+      await prisma.cupom.update({ where: { codigo }, data: { ativo: false } });
+
+      const leitura = await request(app.getHttpServer())
+        .get('/carrinho')
+        .set('X-Cart-Session', sessionToken)
+        .expect(200);
+
+      expect(leitura.body.desconto).toBe(0);
+      expect(leitura.body.cupomCodigo).toBeUndefined();
+    });
   });
 });

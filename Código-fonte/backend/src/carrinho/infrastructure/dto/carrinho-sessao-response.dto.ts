@@ -55,8 +55,17 @@ export class CarrinhoSessaoResponseDto {
   @ApiProperty({ type: [ItemCarrinhoIndisponivelResponseDto] })
   itensIndisponiveis: ItemCarrinhoIndisponivelResponseDto[];
 
-  @ApiProperty({ example: 25.8 })
+  @ApiProperty({ example: 25.8, description: 'Soma dos itens, sem desconto.' })
   total: number;
+
+  @ApiProperty({ example: 0, description: '0 quando nenhum cupom válido está aplicado.' })
+  desconto: number;
+
+  @ApiProperty({ example: 25.8, description: 'total - desconto — o que o cliente paga.' })
+  totalComDesconto: number;
+
+  @ApiPropertyOptional({ example: 'BEMVINDO10' })
+  cupomCodigo?: string;
 
   static fromResultado(resultado: ResultadoVisualizacaoCarrinho): CarrinhoSessaoResponseDto {
     const dto = new CarrinhoSessaoResponseDto();
@@ -66,6 +75,9 @@ export class CarrinhoSessaoResponseDto {
       ...item,
     }));
     dto.total = resultado.total;
+    dto.desconto = resultado.desconto;
+    dto.totalComDesconto = resultado.totalComDesconto;
+    dto.cupomCodigo = resultado.cupomCodigo;
     return dto;
   }
 }
