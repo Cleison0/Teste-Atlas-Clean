@@ -17,9 +17,9 @@ import { ExcluirBannerUseCase } from '../application/excluir-banner.use-case';
 import { CriarBannerDto } from './dto/criar-banner.dto';
 import { AtualizarBannerDto } from './dto/atualizar-banner.dto';
 import { BannerResponseDto } from './dto/banner-response.dto';
-import { JwtAuthGuard } from '../../auth/infrastructure/guards/jwt-auth.guard';
-import { RolesGuard } from '../../auth/infrastructure/guards/roles.guard';
-import { Roles } from '../../auth/infrastructure/decorators/roles.decorator';
+import { JwtAuthGuard } from '../../auth/presentation/guards/jwt-auth.guard';
+import { RolesGuard } from '../../auth/presentation/guards/roles.guard';
+import { Roles } from '../../auth/presentation/decorators/roles.decorator';
 import { PapelUsuario } from '../../auth/domain/papel-usuario.enum';
 
 // Admin-only inteiro: banners ainda não são consumidos pela vitrine pública

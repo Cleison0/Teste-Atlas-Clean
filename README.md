@@ -46,11 +46,12 @@ projeto (documentação, banco de dados, protótipos, testes, apresentação):
 
 ## Arquitetura
 
-Cada módulo do back-end segue a mesma divisão em três camadas, com a dependência sempre apontando para dentro:
+Cada módulo do back-end segue a mesma divisão em quatro camadas, com a dependência sempre apontando para dentro:
 
 - **`domain/`** — entidades, enums, exceções e interfaces de repositório. Sem dependência de framework ou banco.
 - **`application/`** — casos de uso. Orquestram o domínio e dependem apenas de abstrações.
-- **`infrastructure/`** — controllers, DTOs, implementações Prisma e adaptadores de gateway.
+- **`infrastructure/`** — implementações Prisma, adaptadores de gateway e o módulo NestJS (composition root).
+- **`presentation/`** — controllers e DTOs.
 
 O gateway de pagamento é abstraído pela porta `PaymentGateway` no domínio, com o Mercado Pago como adaptador na infraestrutura. Trocar de provedor não exige alterar nenhum caso de uso.
 

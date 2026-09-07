@@ -1,8 +1,8 @@
 import { Module } from '@nestjs/common';
 import { AuthModule } from '../../auth/infrastructure/auth.module';
-import { ClientesController } from './clientes.controller';
-import { EnderecosController } from './enderecos.controller';
-import { ClientesAuthController } from './clientes-auth.controller';
+import { ClientesController } from '../presentation/clientes.controller';
+import { EnderecosController } from '../presentation/enderecos.controller';
+import { ClientesAuthController } from '../presentation/clientes-auth.controller';
 import { PrismaClienteRepository } from './prisma-cliente.repository';
 import { PrismaEnderecoRepository } from './prisma-endereco.repository';
 import { PrismaTokenRecuperacaoSenhaRepository } from './prisma-token-recuperacao-senha.repository';

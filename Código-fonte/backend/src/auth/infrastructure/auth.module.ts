@@ -5,9 +5,9 @@ import { PassportModule } from '@nestjs/passport';
 
 import { PrismaModule } from '../../shared/prisma/prisma.module';
 import { LoginUseCase } from '../application/login.use-case';
-import { AuthController } from './auth.controller';
-import { JwtStrategy } from './strategies/jwt.strategy';
-import { RolesGuard } from './guards/roles.guard';
+import { AuthController } from '../presentation/auth.controller';
+import { JwtStrategy } from '../presentation/strategies/jwt.strategy';
+import { RolesGuard } from '../presentation/guards/roles.guard';
 
 @Module({
   imports: [

@@ -130,8 +130,8 @@ backend rodando (seção acima), precisa de:
 
 ## Criando um módulo novo
 
-Cada módulo mora em `src/<nome>/` com três subpastas — a dependência sempre aponta pra dentro
-(infrastructure → application → domain, nunca o contrário):
+Cada módulo mora em `src/<nome>/` com quatro subpastas — a dependência sempre aponta pra dentro
+(presentation → infrastructure → application → domain, nunca o contrário):
 
 ```
 src/<nome>/
@@ -142,14 +142,21 @@ src/<nome>/
 ├── application/       # um use case por arquivo, orquestra o domínio
 │   ├── criar-<nome>.use-case.ts
 │   └── <nome>.use-case.spec.ts  # um spec só, cobrindo todos os use cases do módulo
-└── infrastructure/
-    ├── prisma-<nome>.repository.ts   # implementa a abstract class do domain/
+├── infrastructure/
+│   ├── prisma-<nome>.repository.ts   # implementa a abstract class do domain/
+│   └── <nome>.module.ts              # composition root: liga o repositório Prisma e registra o controller
+└── presentation/
     ├── <nome>.controller.ts
-    ├── <nome>.module.ts
     └── dto/
         ├── criar-<nome>.dto.ts       # @ApiProperty + class-validator
         └── <nome>-response.dto.ts    # tem um fromDomain(entidade) estático
 ```
+
+`infrastructure/` fica só com o que fala com o mundo externo por baixo (Prisma, gateways HTTP) e
+o `.module.ts` — que continua em `infrastructure/` por ser o composition root do módulo (liga
+tanto o adaptador Prisma quanto o controller de `presentation/`). `presentation/` fica só com o
+que fala com quem consome a API (controller, DTOs, e — quando existir — guards/decorators/
+interceptors específicos do módulo, como em `auth/presentation/guards/`).
 
 `src/categorias/` é o exemplo mais simples e completo pra copiar (CRUD com uma checagem de
 integridade referencial antes de excluir). Passo a passo:
@@ -164,13 +171,15 @@ integridade referencial antes de excluir). Passo a passo:
 3. **`application/`**: um use case por operação, injetando só a abstract class do repositório
    (nunca `PrismaService` direto). Teste com o repositório mockado — ver qualquer
    `*.use-case.spec.ts` existente pro padrão de mock.
-4. **`infrastructure/`**: implemente o repositório com Prisma, os DTOs (sempre com
-   `@ApiProperty`/`@ApiPropertyOptional` do `@nestjs/swagger` — é o que alimenta o `/api/docs`),
-   o controller (rotas de escrita atrás de `@UseGuards(JwtAuthGuard, RolesGuard)` +
-   `@Roles(PapelUsuario.ADMIN)` + `@ApiBearerAuth('access-token')`), e o module (
-   `{ provide: XRepository, useClass: PrismaXRepository }`).
-5. Registre o module novo em [`src/app.module.ts`](src/app.module.ts).
-6. Se o módulo mexe em algo que outro teste e2e já cobre indiretamente (estoque, pagamento),
+4. **`infrastructure/`**: implemente o repositório com Prisma, e o module (
+   `{ provide: XRepository, useClass: PrismaXRepository }`, registrando o controller de
+   `presentation/`).
+5. **`presentation/`**: os DTOs (sempre com `@ApiProperty`/`@ApiPropertyOptional` do
+   `@nestjs/swagger` — é o que alimenta o `/api/docs`) e o controller (rotas de escrita atrás de
+   `@UseGuards(JwtAuthGuard, RolesGuard)` + `@Roles(PapelUsuario.ADMIN)` +
+   `@ApiBearerAuth('access-token')`).
+6. Registre o module novo em [`src/app.module.ts`](src/app.module.ts).
+7. Se o módulo mexe em algo que outro teste e2e já cobre indiretamente (estoque, pagamento),
    considere um teste e2e dedicado em `test/` — ver `test/categorias-marcas.e2e-spec.ts` pro
    padrão de gerar um token ADMIN via `JwtService` direto do módulo compilado.
 
@@ -190,9 +199,22 @@ integridade referencial antes de excluir). Passo a passo:
 | DTO de saída | `<nome-singular>-response.dto.ts`, com `fromDomain()` estático | `categoria-response.dto.ts` → `class CategoriaResponseDto` |
 
 **Convenções deliberadas, não esquecimento:**
-- **Imports são relativos** (`../domain/x`), sem path aliases (`@domain`, etc.). Já foi tentado
-  com `baseUrl` no `tsconfig.json` e quebrou o build — removido de propósito (ver histórico do
-  Git). Não reintroduzir sem resolver isso primeiro. Exemplo real, de dentro de
+- **Imports são relativos** (`../domain/x`), sem path aliases (`@domain`, etc.). Nunca chegou a
+  existir um alias configurado nesse backend — o `baseUrl` sozinho que existiu brevemente no
+  `tsconfig.json` (sem nenhum `paths` junto) foi removido só por estar depreciado no TypeScript
+  (commits `42b9d3c`/`267cb48`), não por ter quebrado nada em runtime.
+  Os motivos reais pra não introduzir agora: (1) o projeto tem 12 módulos, cada um com sua
+  própria `domain/`/`application/`/`infrastructure/`/`presentation/`, e boa parte dos imports é
+  entre módulos
+  (ex: `pedidos` importa `ProdutoRepository` de `produtos/domain`) — um alias plano tipo
+  `@domain/*` fica ambíguo (domain de qual módulo?), precisaria virar um alias por módulo
+  (`@pedidos/domain/*`, `@produtos/domain/*`, ...). (2) `paths` no `tsconfig.json` só vale pro
+  compilador/IDE — em runtime (`node dist/main.js`) e nos testes (duas configs de Jest
+  separadas, unit e e2e) precisaria de um resolvedor à parte (`tsc-alias` ou `tsconfig-paths`,
+  esse último já instalado mas nunca ligado a nada) configurado nos três lugares. Não é
+  proibido reintroduzir — só não é gratuito, então exige decidir o esquema de aliases (por
+  módulo, não plano) e testar de verdade contra `node dist/main` antes de migrar os imports
+  existentes. Exemplo real de import relativo hoje, de dentro de
   `pedidos/application/criar-pedido.use-case.ts`:
   ```ts
   import { PedidoRepository } from '../domain/pedido.repository';

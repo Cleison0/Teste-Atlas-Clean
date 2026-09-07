@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
-import { ProdutosController } from './produtos.controller';
-import { ImagensProdutoController } from './imagens-produto.controller';
+import { ProdutosController } from '../presentation/produtos.controller';
+import { ImagensProdutoController } from '../presentation/imagens-produto.controller';
 import { PrismaProdutoRepository } from './prisma-produto.repository';
 import { PrismaImagemProdutoRepository } from './prisma-imagem-produto.repository';
 import { CloudinaryStorageAdapter } from './cloudinary-storage.adapter';

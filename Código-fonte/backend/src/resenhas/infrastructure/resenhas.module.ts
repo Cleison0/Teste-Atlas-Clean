@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { ResenhasController } from './resenhas.controller';
+import { ResenhasController } from '../presentation/resenhas.controller';
 import { PrismaResenhaRepository } from './prisma-resenha.repository';
 import { ResenhaRepository } from '../domain/resenha.repository';
 import { ListarResenhasUseCase } from '../application/listar-resenhas.use-case';

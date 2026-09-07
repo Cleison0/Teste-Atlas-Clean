@@ -3,7 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { PedidosModule } from '../../pedidos/infrastructure/pedidos.module';
 import { ProdutosModule } from '../../produtos/infrastructure/produtos.module';
 import { CuponsModule } from '../../cupons/infrastructure/cupons.module';
-import { PagamentosController } from './pagamentos.controller';
+import { PagamentosController } from '../presentation/pagamentos.controller';
 import { PrismaPagamentoRepository } from './prisma-pagamento.repository';
 import { PagamentoRepository } from '../domain/pagamento.repository';
 import { PaymentGateway } from '../domain/payment-gateway.port';

@@ -15,7 +15,7 @@ import { ProcessarWebhookUseCase } from '../application/processar-webhook.use-ca
 import { CriarPagamentoDto } from './dto/criar-pagamento.dto';
 import { PagamentoResponseDto } from './dto/pagamento-response.dto';
 import { WebhookMercadoPagoDto } from './dto/webhook-mercadopago.dto';
-import { validarAssinaturaWebhookMercadoPago } from './gateways/mercado-pago-webhook-signature';
+import { validarAssinaturaWebhookMercadoPago } from '../infrastructure/gateways/mercado-pago-webhook-signature';
 
 @ApiTags('pagamentos')
 @Controller('pagamentos')
