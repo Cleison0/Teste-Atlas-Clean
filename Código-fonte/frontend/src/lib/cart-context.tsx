@@ -4,9 +4,11 @@ import { ReactNode, createContext, useContext, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   adicionarItemCarrinho,
+  aplicarCupomCarrinho,
   atualizarQuantidadeItemCarrinho,
   buscarCarrinho,
   limparCarrinhoServidor,
+  removerCupomCarrinho,
   removerItemCarrinho,
   type CarrinhoServidor,
 } from '@/lib/carrinho-api';
@@ -18,12 +20,22 @@ export type {
 
 export const CHAVE_QUERY_CARRINHO = ['carrinho'] as const;
 
-const CARRINHO_VAZIO: CarrinhoServidor = { itens: [], itensIndisponiveis: [], total: 0 };
+const CARRINHO_VAZIO: CarrinhoServidor = {
+  itens: [],
+  itensIndisponiveis: [],
+  total: 0,
+  desconto: 0,
+  totalComDesconto: 0,
+};
 
 interface CartContextValue {
   itens: CarrinhoServidor['itens'];
   itensIndisponiveis: CarrinhoServidor['itensIndisponiveis'];
   total: number;
+  /** 0 quando nenhum cupom válido está aplicado (ver Carrinho.cupomCodigo no backend). */
+  desconto: number;
+  totalComDesconto: number;
+  cupomCodigo: string | undefined;
   /** false enquanto o carrinho (agora persistido no servidor) ainda não terminou de
    * carregar. Consumidores que decidem algo com base em "carrinho vazio" (ex.:
    * redirecionar pra fora do checkout) precisam esperar isso virar true antes de
@@ -36,6 +48,10 @@ interface CartContextValue {
   remover: (produtoId: string) => Promise<void>;
   atualizarQuantidade: (produtoId: string, quantidade: number) => Promise<void>;
   limpar: () => Promise<void>;
+  /** Lança a mensagem de erro do backend (ex: cupom inválido/expirado) — quem chama
+   * decide como mostrar. */
+  aplicarCupom: (cupomCodigo: string) => Promise<void>;
+  removerCupom: () => Promise<void>;
   /** Drawer lateral (mesmo padrão do site antigo: botão do header abre uma prévia
    * do carrinho na lateral, em vez de navegar direto pra uma página cheia). */
   drawerAberto: boolean;
@@ -84,6 +100,14 @@ export function CartProvider({ children }: { children: ReactNode }) {
     mutationFn: () => limparCarrinhoServidor(),
     onSuccess: aposMutar,
   });
+  const aplicarCupomMutation = useMutation({
+    mutationFn: (cupomCodigo: string) => aplicarCupomCarrinho(cupomCodigo),
+    onSuccess: aposMutar,
+  });
+  const removerCupomMutation = useMutation({
+    mutationFn: () => removerCupomCarrinho(),
+    onSuccess: aposMutar,
+  });
 
   const carrinho = carrinhoQuery.data ?? CARRINHO_VAZIO;
   const hidratado = !carrinhoQuery.isLoading;
@@ -105,18 +129,31 @@ export function CartProvider({ children }: { children: ReactNode }) {
     await limparMutation.mutateAsync();
   }
 
+  async function aplicarCupom(cupomCodigo: string) {
+    await aplicarCupomMutation.mutateAsync(cupomCodigo);
+  }
+
+  async function removerCupom() {
+    await removerCupomMutation.mutateAsync();
+  }
+
   return (
     <CartContext.Provider
       value={{
         itens: carrinho.itens,
         itensIndisponiveis: carrinho.itensIndisponiveis,
         total: carrinho.total,
+        desconto: carrinho.desconto,
+        totalComDesconto: carrinho.totalComDesconto,
+        cupomCodigo: carrinho.cupomCodigo,
         hidratado,
         quantidadeTotal,
         adicionar,
         remover,
         atualizarQuantidade,
         limpar,
+        aplicarCupom,
+        removerCupom,
         drawerAberto,
         abrirDrawer: () => setDrawerAberto(true),
         fecharDrawer: () => setDrawerAberto(false),

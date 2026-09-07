@@ -28,6 +28,13 @@ export abstract class CarrinhoSessaoRepository {
   ): Promise<void>;
   abstract removerItem(carrinhoId: string, produtoId: string): Promise<void>;
   abstract limpar(carrinhoId: string): Promise<void>;
+  /** `null` remove o cupom aplicado. Não valida nada aqui — validação de cupom é
+   * responsabilidade do use case (ver AplicarCupomCarrinhoUseCase), o repositório só persiste. */
+  abstract definirCupom(
+    carrinhoId: string,
+    cupomCodigo: string | null,
+    expiraEm: Date,
+  ): Promise<void>;
   /** Apaga carrinhos com `expiraEm` anterior a `antesDe` (e seus itens). Devolve
    * quantos carrinhos foram removidos, só pra log do scheduler. */
   abstract deletarExpirados(antesDe: Date): Promise<number>;

@@ -18,8 +18,18 @@ function formatarMoeda(valor: number): string {
 
 export default function CarrinhoPage() {
   const router = useRouter();
-  const { itens, itensIndisponiveis, total, hidratado, atualizarQuantidade, remover, limpar } =
-    useCart();
+  const {
+    itens,
+    itensIndisponiveis,
+    total,
+    desconto,
+    totalComDesconto,
+    cupomCodigo,
+    hidratado,
+    atualizarQuantidade,
+    remover,
+    limpar,
+  } = useCart();
 
   const temItemIndisponivel =
     itensIndisponiveis.length > 0 || itens.some((item) => !item.disponivel);
@@ -130,6 +140,12 @@ export default function CarrinhoPage() {
             ))}
           </div>
 
+          {!!cupomCodigo && (
+            <p className="mb-2 text-right text-[12.5px] text-green">
+              Cupom <span className="font-mono font-semibold">{cupomCodigo}</span> — desconto de{' '}
+              {formatarMoeda(desconto)}
+            </p>
+          )}
           <div className="mb-4 flex items-center justify-between">
             <button
               type="button"
@@ -139,7 +155,7 @@ export default function CarrinhoPage() {
               Limpar carrinho
             </button>
             <span className="font-display text-lg font-bold text-navy">
-              Total: {formatarMoeda(total)}
+              Total: {formatarMoeda(cupomCodigo ? totalComDesconto : total)}
             </span>
           </div>
 

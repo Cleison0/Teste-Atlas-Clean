@@ -19,5 +19,8 @@ export class CarrinhoSessao {
     public readonly clienteId: string | undefined,
     public readonly itens: ItemCarrinhoSessao[],
     public readonly expiraEm?: Date,
+    /** Reconferido a cada leitura (VisualizarCarrinhoUseCase) — pode estar
+     * presente aqui mesmo se não for mais válido (expirado, esgotado). */
+    public readonly cupomCodigo?: string,
   ) {}
 }

@@ -89,6 +89,17 @@ export class PrismaCarrinhoSessaoRepository extends CarrinhoSessaoRepository {
     await this.prisma.itemCarrinho.deleteMany({ where: { carrinhoId } });
   }
 
+  async definirCupom(
+    carrinhoId: string,
+    cupomCodigo: string | null,
+    expiraEm: Date,
+  ): Promise<void> {
+    await this.prisma.carrinho.update({
+      where: { id: carrinhoId },
+      data: { cupomCodigo, expiraEm },
+    });
+  }
+
   async deletarExpirados(antesDe: Date): Promise<number> {
     const expirados = await this.prisma.carrinho.findMany({
       where: { expiraEm: { lt: antesDe } },
@@ -111,6 +122,7 @@ export class PrismaCarrinhoSessaoRepository extends CarrinhoSessaoRepository {
       carrinho.clienteId ?? undefined,
       carrinho.itens.map((item) => new ItemCarrinhoSessao(item.produtoId, item.quantidade)),
       carrinho.expiraEm ?? undefined,
+      carrinho.cupomCodigo ?? undefined,
     );
   }
 }

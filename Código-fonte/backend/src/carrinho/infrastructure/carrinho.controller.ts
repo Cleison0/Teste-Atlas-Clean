@@ -17,10 +17,13 @@ import { AdicionarItemCarrinhoUseCase } from '../application/adicionar-item-carr
 import { AtualizarQuantidadeItemCarrinhoUseCase } from '../application/atualizar-quantidade-item-carrinho.use-case';
 import { RemoverItemCarrinhoUseCase } from '../application/remover-item-carrinho.use-case';
 import { LimparCarrinhoUseCase } from '../application/limpar-carrinho.use-case';
+import { AplicarCupomCarrinhoUseCase } from '../application/aplicar-cupom-carrinho.use-case';
+import { RemoverCupomCarrinhoUseCase } from '../application/remover-cupom-carrinho.use-case';
 import { CalcularCarrinhoDto } from './dto/calcular-carrinho.dto';
 import { CarrinhoResponseDto } from './dto/carrinho-response.dto';
 import { AdicionarItemCarrinhoDto } from './dto/adicionar-item-carrinho.dto';
 import { AtualizarQuantidadeItemDto } from './dto/atualizar-quantidade-item.dto';
+import { AplicarCupomCarrinhoDto } from './dto/aplicar-cupom-carrinho.dto';
 import { CarrinhoSessaoResponseDto } from './dto/carrinho-sessao-response.dto';
 import { OptionalJwtAuthGuard } from '../../auth/infrastructure/guards/optional-jwt-auth.guard';
 import { SessaoCarrinhoInterceptor } from './interceptors/sessao-carrinho.interceptor';
@@ -41,6 +44,8 @@ export class CarrinhoController {
     private readonly atualizarQuantidadeItemCarrinhoUseCase: AtualizarQuantidadeItemCarrinhoUseCase,
     private readonly removerItemCarrinhoUseCase: RemoverItemCarrinhoUseCase,
     private readonly limparCarrinhoUseCase: LimparCarrinhoUseCase,
+    private readonly aplicarCupomCarrinhoUseCase: AplicarCupomCarrinhoUseCase,
+    private readonly removerCupomCarrinhoUseCase: RemoverCupomCarrinhoUseCase,
   ) {}
 
   // Endpoint público original: revalida/precifica uma lista de itens enviada no
@@ -137,6 +142,37 @@ export class CarrinhoController {
   ): Promise<CarrinhoSessaoResponseDto> {
     const clienteId = this.clienteIdDaRequisicao(request);
     const tokenResolvido = await this.limparCarrinhoUseCase.executar(sessionToken, clienteId);
+    const resultado = await this.visualizarCarrinhoUseCase.executar(tokenResolvido, clienteId);
+    return CarrinhoSessaoResponseDto.fromResultado(resultado);
+  }
+
+  @Post('cupom')
+  @UseGuards(OptionalJwtAuthGuard)
+  @UseInterceptors(SessaoCarrinhoInterceptor)
+  async aplicarCupom(
+    @Body() dto: AplicarCupomCarrinhoDto,
+    @SessaoCarrinhoToken() sessionToken: string | undefined,
+    @Req() request: RequisicaoComClienteOpcional,
+  ): Promise<CarrinhoSessaoResponseDto> {
+    const clienteId = this.clienteIdDaRequisicao(request);
+    const tokenResolvido = await this.aplicarCupomCarrinhoUseCase.executar(
+      sessionToken,
+      clienteId,
+      dto.cupomCodigo,
+    );
+    const resultado = await this.visualizarCarrinhoUseCase.executar(tokenResolvido, clienteId);
+    return CarrinhoSessaoResponseDto.fromResultado(resultado);
+  }
+
+  @Delete('cupom')
+  @UseGuards(OptionalJwtAuthGuard)
+  @UseInterceptors(SessaoCarrinhoInterceptor)
+  async removerCupom(
+    @SessaoCarrinhoToken() sessionToken: string | undefined,
+    @Req() request: RequisicaoComClienteOpcional,
+  ): Promise<CarrinhoSessaoResponseDto> {
+    const clienteId = this.clienteIdDaRequisicao(request);
+    const tokenResolvido = await this.removerCupomCarrinhoUseCase.executar(sessionToken, clienteId);
     const resultado = await this.visualizarCarrinhoUseCase.executar(tokenResolvido, clienteId);
     return CarrinhoSessaoResponseDto.fromResultado(resultado);
   }
