@@ -174,10 +174,30 @@ integridade referencial antes de excluir). Passo a passo:
    considere um teste e2e dedicado em `test/` — ver `test/categorias-marcas.e2e-spec.ts` pro
    padrão de gerar um token ADMIN via `JwtService` direto do módulo compilado.
 
+**Convenção de nomenclatura:**
+
+| O quê | Padrão | Exemplo |
+|---|---|---|
+| Pasta do módulo | `kebab-case`, plural do domínio | `src/categorias/` |
+| Entidade | `<nome-singular>.entity.ts`, classe `PascalCase` | `categoria.entity.ts` → `class Categoria` |
+| Porta de repositório | `<nome-singular>.repository.ts`, `abstract class` | `categoria.repository.ts` → `abstract class CategoriaRepository` |
+| Exceções de domínio | `<nome-plural>.exceptions.ts`, `extends DomainException` | `categorias.exceptions.ts` → `class CategoriaNaoEncontradaException` |
+| Caso de uso | `<verbo>-<nome-singular>.use-case.ts`, um por arquivo | `criar-categoria.use-case.ts` → `class CriarCategoriaUseCase` |
+| Implementação Prisma | `prisma-<nome-singular>.repository.ts` | `prisma-categoria.repository.ts` → `class PrismaCategoriaRepository` |
+| Controller | `<nome-plural>.controller.ts` | `categorias.controller.ts` → `class CategoriasController` |
+| Módulo NestJS | `<nome-plural>.module.ts` | `categorias.module.ts` → `class CategoriasModule` |
+| DTO de entrada | `<verbo>-<nome-singular>.dto.ts` | `criar-categoria.dto.ts` → `class CriarCategoriaDto` |
+| DTO de saída | `<nome-singular>-response.dto.ts`, com `fromDomain()` estático | `categoria-response.dto.ts` → `class CategoriaResponseDto` |
+
 **Convenções deliberadas, não esquecimento:**
 - **Imports são relativos** (`../domain/x`), sem path aliases (`@domain`, etc.). Já foi tentado
   com `baseUrl` no `tsconfig.json` e quebrou o build — removido de propósito (ver histórico do
-  Git). Não reintroduzir sem resolver isso primeiro.
+  Git). Não reintroduzir sem resolver isso primeiro. Exemplo real, de dentro de
+  `pedidos/application/criar-pedido.use-case.ts`:
+  ```ts
+  import { PedidoRepository } from '../domain/pedido.repository';
+  import { ProdutoRepository } from '../../produtos/domain/produto.repository';
+  ```
 - **Sem barrel files** (`index.ts` reexportando tudo do módulo) — cada arquivo é importado pelo
   caminho completo.
 - Toda escrita em `Produto.estoque` passa pelo `TransactionManager`
