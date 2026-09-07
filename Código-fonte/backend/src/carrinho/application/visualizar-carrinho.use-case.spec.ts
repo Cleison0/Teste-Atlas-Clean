@@ -31,6 +31,18 @@ function criarProduto(overrides: Partial<Produto> = {}): Produto {
     overrides.preco ?? 10,
     overrides.estoque ?? 5,
     overrides.ativo ?? true,
+    overrides.descricao,
+    overrides.categoria,
+    overrides.createdAt,
+    overrides.updatedAt,
+    overrides.pesoKg,
+    overrides.alturaCm,
+    overrides.larguraCm,
+    overrides.comprimentoCm,
+    overrides.pack,
+    overrides.marca,
+    overrides.produtoTipo,
+    overrides.precoPromocional,
   );
 }
 
@@ -192,6 +204,24 @@ describe('VisualizarCarrinhoUseCase', () => {
 
     expect(resultado.itens[0].subtotal).toBe(20);
     expect(resultado.total).toBe(45.9);
+  });
+
+  it('usa o preço promocional (não o normal) quando o produto está em promoção', async () => {
+    resolverCarrinhoSessaoUseCase.executar.mockResolvedValue({
+      carrinho: new CarrinhoSessao('carrinho-1', 'token-1', undefined, [
+        new ItemCarrinhoSessao('produto-1', 2),
+      ]),
+      sessionTokenNovo: undefined,
+    });
+    produtoRepository.buscarPorIds.mockResolvedValue([
+      criarProduto({ id: 'produto-1', preco: 10, precoPromocional: 7, estoque: 5 }),
+    ]);
+
+    const resultado = await useCase.executar('token-1', undefined);
+
+    expect(resultado.itens[0].precoUnitario).toBe(7);
+    expect(resultado.itens[0].subtotal).toBe(14);
+    expect(resultado.total).toBe(14);
   });
 
   it('total soma só itens disponíveis, ignorando os indisponíveis', async () => {

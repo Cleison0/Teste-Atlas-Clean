@@ -26,6 +26,18 @@ function criarProduto(overrides: Partial<Produto> = {}): Produto {
     overrides.preco ?? 12.5,
     overrides.estoque ?? 10,
     overrides.ativo ?? true,
+    overrides.descricao,
+    overrides.categoria,
+    overrides.createdAt,
+    overrides.updatedAt,
+    overrides.pesoKg,
+    overrides.alturaCm,
+    overrides.larguraCm,
+    overrides.comprimentoCm,
+    overrides.pack,
+    overrides.marca,
+    overrides.produtoTipo,
+    overrides.precoPromocional,
   );
 }
 
@@ -77,6 +89,18 @@ describe('RepetirPedidoUseCase', () => {
       },
     ]);
     expect(resultado.itensIndisponiveis).toHaveLength(0);
+  });
+
+  it('usa o preço promocional (não o normal) quando o produto está em promoção', async () => {
+    const pedido = criarPedido([new ItemPedidoEntity('prod-1', 'Detergente', 2, 9.99)]);
+    const { useCase, produtoRepository } = montar(pedido);
+    produtoRepository.buscarPorIds.mockResolvedValue([
+      criarProduto({ id: 'prod-1', preco: 15.9, precoPromocional: 12, estoque: 20 }),
+    ]);
+
+    const resultado = await useCase.executar('pedido-1', 'cli-1');
+
+    expect(resultado.itens[0].precoUnitario).toBe(12);
   });
 
   it('produto que não existe mais entra em itensIndisponiveis (PRODUTO_INDISPONIVEL)', async () => {

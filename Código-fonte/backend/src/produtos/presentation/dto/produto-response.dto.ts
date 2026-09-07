@@ -43,6 +43,9 @@ export class ProdutoResponseDto {
   @ApiProperty({ example: 12.9 })
   preco!: number;
 
+  @ApiPropertyOptional({ example: 9.9, description: 'Presente só quando há promoção ativa.' })
+  precoPromocional?: number;
+
   @ApiProperty({ example: 100 })
   estoque!: number;
 
@@ -79,6 +82,7 @@ export class ProdutoResponseDto {
     dto.descricao = produto.descricao;
     dto.categoria = produto.categoria;
     dto.preco = produto.preco;
+    dto.precoPromocional = produto.precoPromocional;
     dto.estoque = produto.estoque;
     dto.ativo = produto.ativo;
     dto.pesoKg = produto.pesoKg;

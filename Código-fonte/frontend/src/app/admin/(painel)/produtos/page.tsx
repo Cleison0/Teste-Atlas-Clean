@@ -103,7 +103,21 @@ export default function ProdutosAdminPage() {
                   {produto.pack ? ` · ${produto.pack}` : ''}
                 </td>
                 <td className="px-3.5 py-2.5 text-muted">{produto.categoria || '—'}</td>
-                <td className="px-3.5 py-2.5">{formatarMoeda(produto.preco)}</td>
+                <td className="px-3.5 py-2.5">
+                  {produto.precoPromocional !== undefined ? (
+                    <span className="flex flex-col gap-0.5">
+                      <span className="text-[11px] text-muted line-through">
+                        {formatarMoeda(produto.preco)}
+                      </span>
+                      <span className="flex items-center gap-1.5">
+                        {formatarMoeda(produto.precoPromocional)}
+                        <Badge variant="amber">promoção</Badge>
+                      </span>
+                    </span>
+                  ) : (
+                    formatarMoeda(produto.preco)
+                  )}
+                </td>
                 <td className="px-3.5 py-2.5">{produto.estoque}</td>
                 <td className="px-3.5 py-2.5">
                   <Badge variant={produto.ativo ? 'green' : 'sky'}>

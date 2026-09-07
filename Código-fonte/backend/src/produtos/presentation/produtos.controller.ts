@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Param, Patch, Post, Put, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { ListarProdutosUseCase } from '../application/listar-produtos.use-case';
+import { ListarProdutosMaisVendidosUseCase } from '../application/listar-produtos-mais-vendidos.use-case';
 import { BuscarProdutoPorIdUseCase } from '../application/buscar-produto-por-id.use-case';
 import { BuscarProdutoPorSlugUseCase } from '../application/buscar-produto-por-slug.use-case';
 import { CriarProdutoUseCase } from '../application/criar-produto.use-case';
@@ -9,6 +10,7 @@ import { AlternarStatusProdutoUseCase } from '../application/alternar-status-pro
 import { CriarProdutoDto } from './dto/criar-produto.dto';
 import { AtualizarProdutoDto } from './dto/atualizar-produto.dto';
 import { ListarProdutosQueryDto } from './dto/listar-produtos-query.dto';
+import { ListarMaisVendidosQueryDto } from './dto/listar-mais-vendidos-query.dto';
 import { ProdutoResponseDto } from './dto/produto-response.dto';
 import { ProdutoPaginadoResponseDto } from './dto/produto-paginado-response.dto';
 import { JwtAuthGuard } from '../../auth/presentation/guards/jwt-auth.guard';
@@ -21,6 +23,7 @@ import { PapelUsuario } from '../../auth/domain/papel-usuario.enum';
 export class ProdutosController {
   constructor(
     private readonly listarProdutosUseCase: ListarProdutosUseCase,
+    private readonly listarProdutosMaisVendidosUseCase: ListarProdutosMaisVendidosUseCase,
     private readonly buscarProdutoPorIdUseCase: BuscarProdutoPorIdUseCase,
     private readonly buscarProdutoPorSlugUseCase: BuscarProdutoPorSlugUseCase,
     private readonly criarProdutoUseCase: CriarProdutoUseCase,
@@ -38,6 +41,15 @@ export class ProdutosController {
   async buscarPorSlug(@Param('slug') slug: string): Promise<ProdutoResponseDto> {
     const produto = await this.buscarProdutoPorSlugUseCase.executar(slug);
     return ProdutoResponseDto.fromDomain(produto);
+  }
+
+  // Precisa vir antes de ":id" — senão o Nest casaria "mais-vendidos" como um :id.
+  @Get('mais-vendidos')
+  async listarMaisVendidos(
+    @Query() query: ListarMaisVendidosQueryDto,
+  ): Promise<ProdutoResponseDto[]> {
+    const produtos = await this.listarProdutosMaisVendidosUseCase.executar(query.limite);
+    return produtos.map(ProdutoResponseDto.fromDomain);
   }
 
   @Get(':id')

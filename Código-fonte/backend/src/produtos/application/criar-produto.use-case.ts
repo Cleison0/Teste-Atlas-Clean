@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Produto } from '../domain/produto.entity';
 import { ProdutoRepository } from '../domain/produto.repository';
+import { PrecoPromocionalInvalidoException } from '../domain/produtos.exceptions';
 import { CriarProdutoDto } from '../presentation/dto/criar-produto.dto';
 import { gerarSlug } from '../../shared/slug.util';
 
@@ -9,6 +10,10 @@ export class CriarProdutoUseCase {
   constructor(private readonly produtoRepository: ProdutoRepository) {}
 
   async executar(dto: CriarProdutoDto): Promise<Produto> {
+    if (dto.precoPromocional !== undefined && dto.precoPromocional >= dto.preco) {
+      throw new PrecoPromocionalInvalidoException();
+    }
+
     const slug = await this.gerarSlugUnico(dto.nome);
 
     return this.produtoRepository.criar({
@@ -22,6 +27,7 @@ export class CriarProdutoUseCase {
       alturaCm: dto.alturaCm,
       larguraCm: dto.larguraCm,
       comprimentoCm: dto.comprimentoCm,
+      precoPromocional: dto.precoPromocional,
     });
   }
 

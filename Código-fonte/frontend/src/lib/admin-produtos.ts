@@ -13,6 +13,8 @@ export interface ProdutoAdmin {
   descricao?: string;
   categoria?: string;
   preco: number;
+  /** Presente só quando há promoção ativa. */
+  precoPromocional?: number;
   estoque: number;
   ativo: boolean;
   pesoKg?: number;
@@ -48,6 +50,8 @@ export interface DadosProdutoForm {
   descricao?: string;
   categoria?: string;
   preco: number;
+  /** null = remove a promoção; undefined = não mexe; número = define/atualiza. */
+  precoPromocional?: number | null;
   estoque?: number;
 }
 

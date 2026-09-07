@@ -1,7 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { Produto } from '../domain/produto.entity';
 import { ProdutoRepository } from '../domain/produto.repository';
-import { ProdutoNaoEncontradoException } from '../domain/produtos.exceptions';
+import {
+  PrecoPromocionalInvalidoException,
+  ProdutoNaoEncontradoException,
+} from '../domain/produtos.exceptions';
 import { AtualizarProdutoDto } from '../presentation/dto/atualizar-produto.dto';
 import { gerarSlug } from '../../shared/slug.util';
 
@@ -13,6 +16,18 @@ export class AtualizarProdutoUseCase {
     const existente = await this.produtoRepository.buscarPorId(id);
     if (!existente) {
       throw new ProdutoNaoEncontradoException(id);
+    }
+
+    // Compara contra o preço que vai valer depois dessa atualização (o novo, se
+    // veio no dto; senão o atual) — não faz sentido validar contra um preço que já
+    // vai deixar de existir.
+    const precoEfetivo = dto.preco ?? existente.preco;
+    if (
+      dto.precoPromocional !== undefined &&
+      dto.precoPromocional !== null &&
+      dto.precoPromocional >= precoEfetivo
+    ) {
+      throw new PrecoPromocionalInvalidoException();
     }
 
     // Se o nome mudou, regenera o slug (mantendo unicidade); senão preserva o slug atual.
@@ -32,6 +47,7 @@ export class AtualizarProdutoUseCase {
       alturaCm: dto.alturaCm,
       larguraCm: dto.larguraCm,
       comprimentoCm: dto.comprimentoCm,
+      precoPromocional: dto.precoPromocional,
     });
   }
 

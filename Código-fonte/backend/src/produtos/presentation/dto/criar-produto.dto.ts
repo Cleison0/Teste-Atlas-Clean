@@ -54,4 +54,14 @@ export class CriarProdutoDto {
   @IsNumber()
   @Min(0.01)
   comprimentoCm?: number;
+
+  @ApiPropertyOptional({
+    example: 9.9,
+    minimum: 0,
+    description: 'Precisa ser menor que `preco`. Omitido/ausente = sem promoção.',
+  })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  precoPromocional?: number;
 }

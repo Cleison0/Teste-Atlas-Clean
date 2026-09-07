@@ -124,6 +124,9 @@ model Produto {
   // banco sem essa classificação.
   categoria     String?
   preco         Decimal @db.Decimal(10, 2)
+  // Promoção ativa = campo preenchido (a invariante precoPromocional < preco é
+  // garantida na escrita, pela camada de aplicação — não há checagem no banco).
+  precoPromocional Decimal? @map("preco_promocional") @db.Decimal(10, 2)
   estoque       Int     @default(0)
 
   // Dados físicos usados para cotação de frete.

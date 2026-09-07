@@ -7,6 +7,6 @@ export interface Marca {
 }
 
 // GET /marcas é público (a loja usa pro carrossel de marcas da home).
-export function listarMarcas(): Promise<Marca[]> {
-  return api.get<Marca[]>('/marcas');
+export function listarMarcas(opcoes?: { next?: { revalidate?: number } }): Promise<Marca[]> {
+  return api.get<Marca[]>('/marcas', opcoes);
 }

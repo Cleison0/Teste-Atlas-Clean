@@ -15,3 +15,11 @@ export class ImagemProdutoNaoEncontradaException extends DomainException {
     super(`Imagem ${id} não encontrada.`);
   }
 }
+
+export class PrecoPromocionalInvalidoException extends DomainException {
+  readonly code = 'PRECO_PROMOCIONAL_INVALIDO';
+
+  constructor() {
+    super('O preço promocional precisa ser menor que o preço normal.');
+  }
+}

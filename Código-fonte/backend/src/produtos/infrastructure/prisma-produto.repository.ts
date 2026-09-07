@@ -11,12 +11,23 @@ import {
   ResultadoPaginado,
 } from '../domain/produto.repository';
 import { EstoqueInsuficienteException } from '../../carrinho/domain/carrinho.exceptions';
+import { StatusPedido } from '../../pedidos/domain/status-pedido.enum';
 import type {
   Produto as ProdutoPrisma,
   Marca as MarcaPrisma,
   ProdutoTipo as ProdutoTipoPrisma,
   Prisma,
 } from '@prisma/client';
+
+// Pedidos nesses status foram pagos de verdade (e, no caso de SEPARACAO em diante,
+// seguem pagos) — é o que conta como "venda" pra ranking de mais vendidos. Excluídos:
+// CRIADO/AGUARDANDO_* (nunca chegaram a ser pagos) e CANCELADO/ESTORNADO (revertidos).
+const STATUS_CONTAM_COMO_VENDA: StatusPedido[] = [
+  StatusPedido.PAGO,
+  StatusPedido.SEPARACAO,
+  StatusPedido.ENVIADO,
+  StatusPedido.ENTREGUE,
+];
 
 /** Cliente Prisma "normal" ou um client de transação (`tx` de `$transaction`) — mesma API pros métodos usados aqui. */
 type ClientePrisma = PrismaService | Prisma.TransactionClient;
@@ -46,6 +57,7 @@ export class PrismaProdutoRepository extends ProdutoRepository {
       busca,
       categoria,
       ativo,
+      emPromocao,
       ordenarPor = 'createdAt',
       direcao = 'desc',
     } = filtros;
@@ -60,6 +72,9 @@ export class PrismaProdutoRepository extends ProdutoRepository {
     }
     if (categoria) where.categoria = categoria;
     if (ativo !== undefined) where.ativo = ativo;
+    // A invariante precoPromocional < preco é garantida na escrita (use case), então
+    // "tem promoção ativa" aqui é só "o campo está preenchido".
+    if (emPromocao) where.precoPromocional = { not: null };
 
     const [produtos, total] = await this.prisma.$transaction([
       this.prisma.produto.findMany({
@@ -117,6 +132,7 @@ export class PrismaProdutoRepository extends ProdutoRepository {
         alturaCm: dados.alturaCm,
         larguraCm: dados.larguraCm,
         comprimentoCm: dados.comprimentoCm,
+        precoPromocional: dados.precoPromocional,
       },
     });
     return this.paraDominio(produto);
@@ -137,9 +153,37 @@ export class PrismaProdutoRepository extends ProdutoRepository {
         alturaCm: dados.alturaCm,
         larguraCm: dados.larguraCm,
         comprimentoCm: dados.comprimentoCm,
+        // undefined = Prisma ignora o campo (não mexe); null = limpa a coluna.
+        precoPromocional: dados.precoPromocional,
       },
     });
     return this.paraDominio(produto);
+  }
+
+  async listarMaisVendidos(limite: number): Promise<Produto[]> {
+    // Busca uma folga a mais (2x) porque `buscarPorIds` abaixo ainda filtra por
+    // ativo=true — sem a folga, produtos mais vendidos porém desativados
+    // reduziriam a lista final pra menos que `limite`.
+    const agregado = await this.prisma.itemPedido.groupBy({
+      by: ['produtoId'],
+      where: { pedido: { status: { in: STATUS_CONTAM_COMO_VENDA } } },
+      _sum: { quantidade: true },
+      orderBy: { _sum: { quantidade: 'desc' } },
+      take: limite * 2,
+    });
+
+    if (agregado.length === 0) return [];
+
+    const produtos = await this.prisma.produto.findMany({
+      where: { id: { in: agregado.map((item) => item.produtoId) }, ativo: true },
+      include: INCLUDE_RELACOES,
+    });
+
+    // findMany não preserva a ordem de `in` — reordena pela posição no agregado.
+    const ordemPorId = new Map(agregado.map((item, indice) => [item.produtoId, indice]));
+    produtos.sort((a, b) => (ordemPorId.get(a.id) ?? 0) - (ordemPorId.get(b.id) ?? 0));
+
+    return produtos.slice(0, limite).map((produto) => this.paraDominio(produto));
   }
 
   async decrementarEstoque(itens: ItemParaDecrementarEstoque[], contexto?: unknown): Promise<void> {
@@ -208,6 +252,7 @@ export class PrismaProdutoRepository extends ProdutoRepository {
         ? { id: marca.id, nome: marca.nome, imagemUrl: marca.imagemUrl ?? undefined }
         : undefined,
       produtoTipo?.slug ? { slug: produtoTipo.slug, nome: produtoTipo.nome } : undefined,
+      produto.precoPromocional !== null ? Number(produto.precoPromocional) : undefined,
     );
   }
 }

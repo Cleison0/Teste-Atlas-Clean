@@ -3,15 +3,11 @@
 import { useState } from 'react';
 import { useCart } from '@/lib/cart-context';
 import { Stepper } from '@/components/ui/Stepper';
+import { Badge } from '@/components/ui/Badge';
 import { useToast } from '@/components/ui/Toast';
 import { useImagemPrincipal } from '@/hooks/use-imagem-principal';
+import { corDaCategoria } from '@/lib/categoria-visual';
 import type { Produto } from '@/lib/produtos';
-
-const COR_POR_CATEGORIA: Record<string, string> = {
-  limpeza: '#EAF4FF',
-  descartaveis: '#FFF3E0',
-  papelaria: '#EAF7EF',
-};
 
 function formatarMoeda(valor: number): string {
   return valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -31,10 +27,14 @@ export function ProductCard({ produto, indice = 0 }: ProductCardProps) {
   const { principal: imagemProduto } = useImagemPrincipal(produto.id);
 
   const noCarrinho = itens.find((item) => item.produtoId === produto.id);
-  const corFundo = COR_POR_CATEGORIA[produto.categoria ?? ''] ?? '#EAF4FF';
+  const corFundo = corDaCategoria(produto.categoria);
   // Delay escalonado só pros primeiros itens visíveis — evita uma cascata
   // absurdamente longa em grids grandes.
   const delayMs = Math.min(indice, 7) * 30;
+  const emPromocao = produto.precoPromocional !== undefined;
+  const percentualDesconto = emPromocao
+    ? Math.round((1 - produto.precoPromocional! / produto.preco) * 100)
+    : 0;
 
   async function aoAdicionar() {
     await adicionar(produto.id);
@@ -53,6 +53,11 @@ export function ProductCard({ produto, indice = 0 }: ProductCardProps) {
         <span className="absolute left-2 top-2 rounded-atlas-sm bg-white/80 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-navy">
           {produto.categoria ?? 'produto'}
         </span>
+        {emPromocao && (
+          <Badge variant="amber" className="absolute right-2 top-2">
+            -{percentualDesconto}%
+          </Badge>
+        )}
         {nivelFallback === 0 && imagemProduto ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -84,9 +89,20 @@ export function ProductCard({ produto, indice = 0 }: ProductCardProps) {
         {produto.pack && <p className="text-[12px] text-muted">{produto.pack}</p>}
 
         <div className="mt-auto flex items-center justify-between pt-2">
-          <span className="font-mono text-[14px] font-bold text-navy">
-            {formatarMoeda(produto.preco)}
-          </span>
+          {emPromocao ? (
+            <span className="flex flex-col">
+              <span className="font-mono text-[11px] text-muted line-through">
+                {formatarMoeda(produto.preco)}
+              </span>
+              <span className="font-mono text-[14px] font-bold text-green">
+                {formatarMoeda(produto.precoPromocional!)}
+              </span>
+            </span>
+          ) : (
+            <span className="font-mono text-[14px] font-bold text-navy">
+              {formatarMoeda(produto.preco)}
+            </span>
+          )}
           {noCarrinho ? (
             <Stepper
               quantidade={noCarrinho.quantidade}

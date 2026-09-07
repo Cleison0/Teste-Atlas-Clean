@@ -2,18 +2,7 @@
 
 import Link from 'next/link';
 import { useImagemPrincipal } from '@/hooks/use-imagem-principal';
-
-const COR_POR_CATEGORIA: Record<string, string> = {
-  limpeza: '#EAF4FF',
-  descartaveis: '#FFF3E0',
-  papelaria: '#EAF7EF',
-};
-
-const ICONE_POR_CATEGORIA: Record<string, string> = {
-  limpeza: '🧴',
-  descartaveis: '🥤',
-  papelaria: '📎',
-};
+import { corDaCategoria, iconeDaCategoria } from '@/lib/categoria-visual';
 
 function formatarMoeda(valor: number): string {
   return valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -49,8 +38,8 @@ export function ProductTypeCard({
   produtoRepresentativoId,
   indice = 0,
 }: ProductTypeCardProps) {
-  const corFundo = COR_POR_CATEGORIA[categoria ?? ''] ?? '#EAF4FF';
-  const icone = ICONE_POR_CATEGORIA[categoria ?? ''] ?? '🧴';
+  const corFundo = corDaCategoria(categoria);
+  const icone = iconeDaCategoria(categoria);
   const delayMs = Math.min(indice, 7) * 30;
   const { principal: imagemProduto } = useImagemPrincipal(produtoRepresentativoId);
 

@@ -36,6 +36,16 @@ export class ListarProdutosQueryDto {
   @IsBooleanString()
   ativo?: string;
 
+  /** Vem como string na query string (ex: ?emPromocao=true). true = só produtos com
+   * preço promocional cadastrado. */
+  @ApiPropertyOptional({
+    example: 'true',
+    description: 'String "true"/"false". true = só produtos com promoção ativa.',
+  })
+  @IsOptional()
+  @IsBooleanString()
+  emPromocao?: string;
+
   @ApiPropertyOptional({ enum: ['nome', 'preco', 'createdAt'], default: 'createdAt' })
   @IsOptional()
   @IsIn(['nome', 'preco', 'createdAt'])

@@ -8,6 +8,7 @@ import { ProdutoRepository } from '../domain/produto.repository';
 import { ImagemProdutoRepository } from '../domain/imagem-produto.repository';
 import { ImageStorage } from '../domain/image-storage.port';
 import { ListarProdutosUseCase } from '../application/listar-produtos.use-case';
+import { ListarProdutosMaisVendidosUseCase } from '../application/listar-produtos-mais-vendidos.use-case';
 import { BuscarProdutoPorIdUseCase } from '../application/buscar-produto-por-id.use-case';
 import { BuscarProdutoPorSlugUseCase } from '../application/buscar-produto-por-slug.use-case';
 import { CriarProdutoUseCase } from '../application/criar-produto.use-case';
@@ -25,6 +26,7 @@ import { DefinirImagemPrincipalUseCase } from '../application/definir-imagem-pri
     { provide: ImagemProdutoRepository, useClass: PrismaImagemProdutoRepository },
     { provide: ImageStorage, useClass: CloudinaryStorageAdapter },
     ListarProdutosUseCase,
+    ListarProdutosMaisVendidosUseCase,
     BuscarProdutoPorIdUseCase,
     BuscarProdutoPorSlugUseCase,
     CriarProdutoUseCase,
