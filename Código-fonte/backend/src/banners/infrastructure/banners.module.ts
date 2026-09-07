@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { BannersController } from './banners.controller';
+import { BannersController } from '../presentation/banners.controller';
 import { PrismaBannerRepository } from './prisma-banner.repository';
 import { BannerRepository } from '../domain/banner.repository';
 import { ListarBannersUseCase } from '../application/listar-banners.use-case';

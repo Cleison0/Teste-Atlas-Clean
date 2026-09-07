@@ -10,7 +10,7 @@ import {
   ValidateIf,
   ValidateNested,
 } from 'class-validator';
-import { CarrinhoItemDto } from '../../../carrinho/infrastructure/dto/calcular-carrinho.dto';
+import { CarrinhoItemDto } from '../../../carrinho/presentation/dto/calcular-carrinho.dto';
 import { TipoEntrega } from '../../domain/pedido.entity';
 import { EnderecoEntregaDto } from './endereco-entrega.dto';
 import { ContatoPedidoDto } from './contato-pedido.dto';

@@ -20,9 +20,9 @@ import { ListarImagensProdutoUseCase } from '../application/listar-imagens-produ
 import { RemoverImagemProdutoUseCase } from '../application/remover-imagem-produto.use-case';
 import { DefinirImagemPrincipalUseCase } from '../application/definir-imagem-principal.use-case';
 import { ImagemProdutoResponseDto } from './dto/imagem-produto-response.dto';
-import { JwtAuthGuard } from '../../auth/infrastructure/guards/jwt-auth.guard';
-import { RolesGuard } from '../../auth/infrastructure/guards/roles.guard';
-import { Roles } from '../../auth/infrastructure/decorators/roles.decorator';
+import { JwtAuthGuard } from '../../auth/presentation/guards/jwt-auth.guard';
+import { RolesGuard } from '../../auth/presentation/guards/roles.guard';
+import { Roles } from '../../auth/presentation/decorators/roles.decorator';
 import { PapelUsuario } from '../../auth/domain/papel-usuario.enum';
 
 const CINCO_MB = 5 * 1024 * 1024;

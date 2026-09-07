@@ -6,9 +6,9 @@ import { AtualizarCupomUseCase } from '../application/atualizar-cupom.use-case';
 import { CriarCupomDto } from './dto/criar-cupom.dto';
 import { AtualizarCupomDto } from './dto/atualizar-cupom.dto';
 import { CupomResponseDto } from './dto/cupom-response.dto';
-import { JwtAuthGuard } from '../../auth/infrastructure/guards/jwt-auth.guard';
-import { RolesGuard } from '../../auth/infrastructure/guards/roles.guard';
-import { Roles } from '../../auth/infrastructure/decorators/roles.decorator';
+import { JwtAuthGuard } from '../../auth/presentation/guards/jwt-auth.guard';
+import { RolesGuard } from '../../auth/presentation/guards/roles.guard';
+import { Roles } from '../../auth/presentation/decorators/roles.decorator';
 import { PapelUsuario } from '../../auth/domain/papel-usuario.enum';
 
 // Admin-only inteiro (diferente de Produtos/Marcas, que listam público): um

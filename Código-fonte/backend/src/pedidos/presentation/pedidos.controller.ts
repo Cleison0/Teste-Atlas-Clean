@@ -12,10 +12,10 @@ import { ListarPedidosAdminQueryDto } from './dto/listar-pedidos-admin-query.dto
 import { PedidoResponseDto } from './dto/pedido-response.dto';
 import { PedidoStatusResponseDto } from './dto/pedido-status-response.dto';
 import { MeusPedidosResponseDto } from './dto/meus-pedidos-response.dto';
-import { JwtAuthGuard } from '../../auth/infrastructure/guards/jwt-auth.guard';
-import { OptionalJwtAuthGuard } from '../../auth/infrastructure/guards/optional-jwt-auth.guard';
-import { RolesGuard } from '../../auth/infrastructure/guards/roles.guard';
-import { Roles } from '../../auth/infrastructure/decorators/roles.decorator';
+import { JwtAuthGuard } from '../../auth/presentation/guards/jwt-auth.guard';
+import { OptionalJwtAuthGuard } from '../../auth/presentation/guards/optional-jwt-auth.guard';
+import { RolesGuard } from '../../auth/presentation/guards/roles.guard';
+import { Roles } from '../../auth/presentation/decorators/roles.decorator';
 import { PapelUsuario } from '../../auth/domain/papel-usuario.enum';
 
 interface RequisicaoComClienteOpcional {

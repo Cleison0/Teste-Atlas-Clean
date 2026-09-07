@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Produto } from '../domain/produto.entity';
 import { ProdutoRepository, ResultadoPaginado } from '../domain/produto.repository';
-import { ListarProdutosQueryDto } from '../infrastructure/dto/listar-produtos-query.dto';
+import { ListarProdutosQueryDto } from '../presentation/dto/listar-produtos-query.dto';
 
 @Injectable()
 export class ListarProdutosUseCase {

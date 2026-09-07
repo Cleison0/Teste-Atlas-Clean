@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { FreteController } from './frete.controller';
+import { FreteController } from '../presentation/frete.controller';
 import { CalcularFreteUseCase } from '../application/calcular-frete.use-case';
 import { ShippingQuoteProvider } from '../domain/shipping-quote.port';
 import { MelhorEnvioShippingQuoteProvider } from './gateways/melhor-envio.adapter';

@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ProdutosModule } from '../../produtos/infrastructure/produtos.module';
 import { CuponsModule } from '../../cupons/infrastructure/cupons.module';
-import { CarrinhoController } from './carrinho.controller';
+import { CarrinhoController } from '../presentation/carrinho.controller';
 import { MontarCarrinhoUseCase } from '../application/montar-carrinho.use-case';
 import { ResolverCarrinhoSessaoUseCase } from '../application/resolver-carrinho-sessao.use-case';
 import { VisualizarCarrinhoUseCase } from '../application/visualizar-carrinho.use-case';

@@ -14,8 +14,8 @@ import { RepetirPedidoUseCase } from '../application/repetir-pedido.use-case';
 import { AtualizarStatusPedidoUseCase } from '../application/atualizar-status-pedido.use-case';
 import { AtualizarRastreioPedidoUseCase } from '../application/atualizar-rastreio-pedido.use-case';
 import { PedidoRepository } from '../domain/pedido.repository';
-import { PedidosController } from './pedidos.controller';
-import { PedidosClienteController } from './pedidos-cliente.controller';
+import { PedidosController } from '../presentation/pedidos.controller';
+import { PedidosClienteController } from '../presentation/pedidos-cliente.controller';
 import { PrismaPedidoRepository } from './prisma-pedido.repository';
 
 @Module({

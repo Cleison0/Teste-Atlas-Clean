@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { CuponsController } from './cupons.controller';
+import { CuponsController } from '../presentation/cupons.controller';
 import { PrismaCupomRepository } from './prisma-cupom.repository';
 import { CupomRepository } from '../domain/cupom.repository';
 import { ListarCuponsUseCase } from '../application/listar-cupons.use-case';

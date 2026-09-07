@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { MarcasController } from './marcas.controller';
+import { MarcasController } from '../presentation/marcas.controller';
 import { PrismaMarcaRepository } from './prisma-marca.repository';
 import { MarcaRepository } from '../domain/marca.repository';
 import { ListarMarcasUseCase } from '../application/listar-marcas.use-case';

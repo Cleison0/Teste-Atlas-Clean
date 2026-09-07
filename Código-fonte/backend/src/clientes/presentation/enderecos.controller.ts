@@ -18,10 +18,10 @@ import { DefinirEnderecoPadraoUseCase } from '../application/definir-endereco-pa
 import { CriarEnderecoDto } from './dto/criar-endereco.dto';
 import { AtualizarEnderecoDto } from './dto/atualizar-endereco.dto';
 import { EnderecoResponseDto } from './dto/endereco-response.dto';
-import { JwtAuthGuard } from '../../auth/infrastructure/guards/jwt-auth.guard';
-import { RolesGuard } from '../../auth/infrastructure/guards/roles.guard';
-import { Roles } from '../../auth/infrastructure/decorators/roles.decorator';
-import { ClienteAtual } from '../../auth/infrastructure/decorators/cliente-atual.decorator';
+import { JwtAuthGuard } from '../../auth/presentation/guards/jwt-auth.guard';
+import { RolesGuard } from '../../auth/presentation/guards/roles.guard';
+import { Roles } from '../../auth/presentation/decorators/roles.decorator';
+import { ClienteAtual } from '../../auth/presentation/decorators/cliente-atual.decorator';
 import { PapelUsuario } from '../../auth/domain/papel-usuario.enum';
 
 // clienteId vem sempre do JWT (ClienteAtual), nunca de um :clienteId de URL — antes

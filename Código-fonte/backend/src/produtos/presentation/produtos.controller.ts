@@ -11,9 +11,9 @@ import { AtualizarProdutoDto } from './dto/atualizar-produto.dto';
 import { ListarProdutosQueryDto } from './dto/listar-produtos-query.dto';
 import { ProdutoResponseDto } from './dto/produto-response.dto';
 import { ProdutoPaginadoResponseDto } from './dto/produto-paginado-response.dto';
-import { JwtAuthGuard } from '../../auth/infrastructure/guards/jwt-auth.guard';
-import { RolesGuard } from '../../auth/infrastructure/guards/roles.guard';
-import { Roles } from '../../auth/infrastructure/decorators/roles.decorator';
+import { JwtAuthGuard } from '../../auth/presentation/guards/jwt-auth.guard';
+import { RolesGuard } from '../../auth/presentation/guards/roles.guard';
+import { Roles } from '../../auth/presentation/decorators/roles.decorator';
 import { PapelUsuario } from '../../auth/domain/papel-usuario.enum';
 
 @ApiTags('produtos')

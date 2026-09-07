@@ -21,10 +21,10 @@ import { AtualizarClienteDto } from './dto/atualizar-cliente.dto';
 import { TrocarSenhaDto } from './dto/trocar-senha.dto';
 import { ClienteResponseDto } from './dto/cliente-response.dto';
 import { EnderecoPorCepResponseDto } from './dto/endereco-por-cep-response.dto';
-import { JwtAuthGuard } from '../../auth/infrastructure/guards/jwt-auth.guard';
-import { RolesGuard } from '../../auth/infrastructure/guards/roles.guard';
-import { Roles } from '../../auth/infrastructure/decorators/roles.decorator';
-import { ClienteAtual } from '../../auth/infrastructure/decorators/cliente-atual.decorator';
+import { JwtAuthGuard } from '../../auth/presentation/guards/jwt-auth.guard';
+import { RolesGuard } from '../../auth/presentation/guards/roles.guard';
+import { Roles } from '../../auth/presentation/decorators/roles.decorator';
+import { ClienteAtual } from '../../auth/presentation/decorators/cliente-atual.decorator';
 import { PapelUsuario } from '../../auth/domain/papel-usuario.enum';
 
 @ApiTags('clientes')

@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Produto } from '../domain/produto.entity';
 import { ProdutoRepository } from '../domain/produto.repository';
-import { CriarProdutoDto } from '../infrastructure/dto/criar-produto.dto';
+import { CriarProdutoDto } from '../presentation/dto/criar-produto.dto';
 import { gerarSlug } from '../../shared/slug.util';
 
 @Injectable()

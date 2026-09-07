@@ -25,7 +25,7 @@ import { AdicionarItemCarrinhoDto } from './dto/adicionar-item-carrinho.dto';
 import { AtualizarQuantidadeItemDto } from './dto/atualizar-quantidade-item.dto';
 import { AplicarCupomCarrinhoDto } from './dto/aplicar-cupom-carrinho.dto';
 import { CarrinhoSessaoResponseDto } from './dto/carrinho-sessao-response.dto';
-import { OptionalJwtAuthGuard } from '../../auth/infrastructure/guards/optional-jwt-auth.guard';
+import { OptionalJwtAuthGuard } from '../../auth/presentation/guards/optional-jwt-auth.guard';
 import { SessaoCarrinhoInterceptor } from './interceptors/sessao-carrinho.interceptor';
 import { SessaoCarrinhoToken } from './decorators/sessao-carrinho-token.decorator';
 import { PapelUsuario } from '../../auth/domain/papel-usuario.enum';

@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Produto } from '../domain/produto.entity';
 import { ProdutoRepository } from '../domain/produto.repository';
 import { ProdutoNaoEncontradoException } from '../domain/produtos.exceptions';
-import { AtualizarProdutoDto } from '../infrastructure/dto/atualizar-produto.dto';
+import { AtualizarProdutoDto } from '../presentation/dto/atualizar-produto.dto';
 import { gerarSlug } from '../../shared/slug.util';
 
 @Injectable()

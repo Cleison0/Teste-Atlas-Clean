@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { CategoriasController } from './categorias.controller';
+import { CategoriasController } from '../presentation/categorias.controller';
 import { PrismaCategoriaRepository } from './prisma-categoria.repository';
 import { CategoriaRepository } from '../domain/categoria.repository';
 import { ListarCategoriasUseCase } from '../application/listar-categorias.use-case';

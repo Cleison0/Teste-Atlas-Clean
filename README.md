@@ -23,10 +23,18 @@ projeto (documentação, banco de dados, protótipos, testes, apresentação):
 ├── Código-fonte/
 │   ├── backend/              # API NestJS
 │   │   ├── src/
-│   │   │   ├── produtos/     # Catálogo
-│   │   │   ├── carrinho/     # Precificação e validação de itens
-│   │   │   ├── pedidos/      # Criação e ciclo de vida do pedido
+│   │   │   ├── auth/         # Login de staff (JWT) e guards de papel
+│   │   │   ├── produtos/     # Catálogo, imagens
+│   │   │   ├── categorias/   # Categorias de produto
+│   │   │   ├── marcas/       # Marcas de produto
+│   │   │   ├── carrinho/     # Carrinho persistido (sessão anônima + cliente) e precificação
+│   │   │   ├── pedidos/      # Criação e máquina de estados do pedido
 │   │   │   ├── pagamentos/   # Integração Mercado Pago e webhook
+│   │   │   ├── clientes/     # Cadastro/login de cliente, endereços
+│   │   │   ├── frete/        # Cotação de frete
+│   │   │   ├── cupons/       # Cupons de desconto
+│   │   │   ├── banners/      # Banners da vitrine
+│   │   │   ├── resenhas/     # Avaliações de produto
 │   │   │   └── shared/       # Prisma e tratamento de exceções
 │   │   └── prisma/           # Schema e migrations
 │   └── frontend/             # Vitrine, checkout e painel administrativo (Next.js)
@@ -38,13 +46,21 @@ projeto (documentação, banco de dados, protótipos, testes, apresentação):
 
 ## Arquitetura
 
-Cada módulo do back-end segue a mesma divisão em três camadas, com a dependência sempre apontando para dentro:
+Cada módulo do back-end segue a mesma divisão em quatro camadas, com a dependência sempre apontando para dentro:
 
 - **`domain/`** — entidades, enums, exceções e interfaces de repositório. Sem dependência de framework ou banco.
 - **`application/`** — casos de uso. Orquestram o domínio e dependem apenas de abstrações.
-- **`infrastructure/`** — controllers, DTOs, implementações Prisma e adaptadores de gateway.
+- **`infrastructure/`** — implementações Prisma, adaptadores de gateway e o módulo NestJS (composition root).
+- **`presentation/`** — controllers e DTOs.
 
 O gateway de pagamento é abstraído pela porta `PaymentGateway` no domínio, com o Mercado Pago como adaptador na infraestrutura. Trocar de provedor não exige alterar nenhum caso de uso.
+
+Transições de status do pedido são centralizadas em `PedidoStateMachine`
+(`src/pedidos/domain/pedido-state-machine.ts`) — nenhum outro lugar do código altera
+`Pedido.status` diretamente. Estados: `CRIADO`/`AGUARDANDO_PAGAMENTO`/`AGUARDANDO_CONTATO` →
+`PAGO` → `SEPARACAO` → `ENVIADO` → `ENTREGUE`, com `CANCELADO`/`ESTORNADO` como saídas —
+cancelamento só é permitido até `PAGO` (a esteira de cumprimento pós-pagamento não tem
+processo de estorno logístico documentado ainda).
 
 Duas invariantes deliberadas:
 
@@ -92,4 +108,4 @@ Documentado abertamente porque o projeto ainda não está pronto para receber pa
 - **O estoque só é reservado na confirmação do pagamento, não no checkout.** A criação do pedido (`CriarPedidoUseCase`) apenas valida disponibilidade em leitura, pra dar feedback rápido ao cliente — não reserva nada. O decremento de verdade acontece em `ReconciliarPedidoService` (`TransactionManager` + UPDATE condicional `estoque >= quantidade`, testado sob concorrência real em `test/pagamentos-webhook.e2e-spec.ts`), compartilhado pelos dois jeitos de um pagamento se confirmar: síncrono (cartão, que o gateway já aprova/recusa na resposta de `POST /pagamentos`) ou assíncrono (Pix, via `ProcessarWebhookUseCase` quando a notificação chega). Decisão deliberada: como não há reserva no checkout, dois pedidos podem ser criados pro mesmo último item — só um consegue confirmar o pagamento; o outro fica registrado como anomalia (pagamento aprovado, sem estoque) pra reconciliação manual, tipicamente estorno ao cliente. O estoque é devolvido automaticamente quando um pedido pago vai a `ESTORNADO`; pedidos cancelados antes de pagar não têm o que devolver, já que nunca chegaram a reservar nada.
 - **A validação de assinatura do webhook é obrigatória em produção.** Sem `MERCADOPAGO_WEBHOOK_SECRET`, a aplicação rejeita a requisição (`401`) quando `NODE_ENV=production`; fora de produção, apenas registra um aviso e aceita (conveniência de dev).
 - **O job de reconciliação de pagamentos perdidos roda a cada 10 minutos** (`ReconciliacaoPagamentosScheduler`) e reconsulta no gateway todo pagamento pendente há mais de 30 minutos — cobre o caso do webhook nunca chegar. Ainda não é configurável por ambiente (intervalo e janela são constantes no código).
-- **Não há transição de estados validada de forma genérica** para o pedido (só a proteção específica contra sobrescrever um status final, com a exceção deliberada de `PAGO → ESTORNADO`), nem e-mails transacionais.
+- **Não há e-mails transacionais** (confirmação de pedido, atualização de status) — o cliente acompanha pelo painel "Minha conta" ou pelo link público `GET /pedidos/:id/status`.
