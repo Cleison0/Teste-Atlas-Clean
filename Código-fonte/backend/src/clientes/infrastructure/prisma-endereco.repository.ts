@@ -54,13 +54,26 @@ export class PrismaEnderecoRepository extends EnderecoRepository {
   }
 
   async definirComoPadrao(id: string, clienteId: string): Promise<Endereco> {
-    const [, enderecoAtualizado] = await this.prisma.$transaction([
-      this.prisma.endereco.updateMany({
+    const enderecoAtualizado = await this.prisma.$transaction(async (tx) => {
+      // Trava TODAS as linhas de endereço do cliente antes de decidir o que
+      // atualizar — não só a que hoje é padrão. Um UPDATE condicionado a
+      // "padrao = true" só trava a linha que encontra; se duas chamadas
+      // concorrentes miram endereços diferentes e nenhuma delas ainda vê a nova
+      // linha padrão da outra (cada UPDATE re-checa só a linha que já estava
+      // mirando, não descobre linhas que passaram a bater com o WHERE depois que
+      // a instrução começou), as duas conseguem setar padrao=true em paralelo e
+      // só uma sobrevive ao índice único parcial — a outra estoura 500 em vez de
+      // ser serializada. Travar o conjunto inteiro do cliente fecha essa janela:
+      // a segunda chamada espera a primeira commitar e aí decide com dado fresco.
+      await tx.$queryRaw`SELECT id FROM enderecos WHERE cliente_id = ${clienteId} FOR UPDATE`;
+
+      await tx.endereco.updateMany({
         where: { clienteId, padrao: true, NOT: { id } },
         data: { padrao: false },
-      }),
-      this.prisma.endereco.update({ where: { id }, data: { padrao: true } }),
-    ]);
+      });
+
+      return tx.endereco.update({ where: { id }, data: { padrao: true } });
+    });
     return this.paraDominio(enderecoAtualizado);
   }
 
