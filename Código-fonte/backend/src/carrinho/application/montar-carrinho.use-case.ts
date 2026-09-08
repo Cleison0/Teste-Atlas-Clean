@@ -57,7 +57,7 @@ export class MontarCarrinhoUseCase {
         produto.id,
         produto.nome,
         quantidade,
-        produto.preco,
+        produto.precoEfetivo(),
         produto.pesoKg,
         produto.alturaCm,
         produto.larguraCm,

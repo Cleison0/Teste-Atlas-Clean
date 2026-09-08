@@ -5,6 +5,7 @@
 import { PrismaProdutoRepository } from './prisma-produto.repository';
 import { PrismaService } from '../../shared/prisma/prisma.service';
 import { EstoqueInsuficienteException } from '../../carrinho/domain/carrinho.exceptions';
+import { StatusPedido } from '../../pedidos/domain/status-pedido.enum';
 
 describe('PrismaProdutoRepository.decrementarEstoque', () => {
   let updateManyMock: jest.Mock;
@@ -64,5 +65,106 @@ describe('PrismaProdutoRepository.decrementarEstoque', () => {
     ).rejects.toBeInstanceOf(EstoqueInsuficienteException);
 
     expect(updateManyMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('PrismaProdutoRepository.listarMaisVendidos', () => {
+  let groupByMock: jest.Mock;
+  let findManyMock: jest.Mock;
+  let repository: PrismaProdutoRepository;
+
+  const produtoBase = {
+    slug: 'produto',
+    descricao: null,
+    categoria: null,
+    estoque: 10,
+    ativo: true,
+    createdAt: new Date('2026-01-01'),
+    updatedAt: new Date('2026-01-01'),
+    pesoKg: null,
+    alturaCm: null,
+    larguraCm: null,
+    comprimentoCm: null,
+    pack: null,
+    precoPromocional: null,
+    marca: null,
+    produtoTipo: null,
+  };
+
+  beforeEach(() => {
+    groupByMock = jest.fn();
+    findManyMock = jest.fn();
+    const prisma = { itemPedido: { groupBy: groupByMock }, produto: { findMany: findManyMock } };
+    repository = new PrismaProdutoRepository(prisma as unknown as PrismaService);
+  });
+
+  it('filtra por status que contam como venda e ordena pela quantidade agregada', async () => {
+    groupByMock.mockResolvedValue([]);
+
+    await repository.listarMaisVendidos(5);
+
+    expect(groupByMock).toHaveBeenCalledWith({
+      by: ['produtoId'],
+      where: {
+        pedido: {
+          status: {
+            in: [
+              StatusPedido.PAGO,
+              StatusPedido.SEPARACAO,
+              StatusPedido.ENVIADO,
+              StatusPedido.ENTREGUE,
+            ],
+          },
+        },
+      },
+      _sum: { quantidade: true },
+      orderBy: { _sum: { quantidade: 'desc' } },
+      take: 10,
+    });
+  });
+
+  it('devolve lista vazia sem consultar produtos quando não há nenhuma venda', async () => {
+    groupByMock.mockResolvedValue([]);
+
+    const resultado = await repository.listarMaisVendidos(5);
+
+    expect(resultado).toEqual([]);
+    expect(findManyMock).not.toHaveBeenCalled();
+  });
+
+  it('reordena os produtos pela posição no agregado (findMany não preserva ordem de "in")', async () => {
+    groupByMock.mockResolvedValue([
+      { produtoId: 'produto-2', _sum: { quantidade: 30 } },
+      { produtoId: 'produto-1', _sum: { quantidade: 10 } },
+    ]);
+    // findMany devolve fora de ordem de propósito, pra provar que o repositório reordena.
+    findManyMock.mockResolvedValue([
+      { id: 'produto-1', nome: 'Produto 1', preco: 10, ...produtoBase },
+      { id: 'produto-2', nome: 'Produto 2', preco: 20, ...produtoBase },
+    ]);
+
+    const resultado = await repository.listarMaisVendidos(5);
+
+    expect(resultado.map((p) => p.id)).toEqual(['produto-2', 'produto-1']);
+  });
+
+  it('só busca produtos ativos e respeita o limite mesmo com folga maior no agregado', async () => {
+    groupByMock.mockResolvedValue([
+      { produtoId: 'produto-1', _sum: { quantidade: 30 } },
+      { produtoId: 'produto-2', _sum: { quantidade: 20 } },
+      { produtoId: 'produto-3', _sum: { quantidade: 10 } },
+    ]);
+    findManyMock.mockResolvedValue([
+      { id: 'produto-1', nome: 'Produto 1', preco: 10, ...produtoBase },
+      { id: 'produto-2', nome: 'Produto 2', preco: 20, ...produtoBase },
+    ]);
+
+    const resultado = await repository.listarMaisVendidos(2);
+
+    expect(findManyMock).toHaveBeenCalledWith({
+      where: { id: { in: ['produto-1', 'produto-2', 'produto-3'] }, ativo: true },
+      include: { marca: true, produtoTipo: true },
+    });
+    expect(resultado).toHaveLength(2);
   });
 });

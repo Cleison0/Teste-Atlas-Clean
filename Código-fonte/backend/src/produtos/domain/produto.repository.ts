@@ -6,6 +6,8 @@ export interface FiltrosListagemProdutos {
   busca?: string;
   categoria?: string;
   ativo?: boolean;
+  /** true = só produtos com preço promocional cadastrado (ver Produto.estaEmPromocao). */
+  emPromocao?: boolean;
   ordenarPor?: 'nome' | 'preco' | 'createdAt';
   direcao?: 'asc' | 'desc';
 }
@@ -28,6 +30,7 @@ export interface DadosCriacaoProduto {
   alturaCm?: number;
   larguraCm?: number;
   comprimentoCm?: number;
+  precoPromocional?: number | null;
 }
 
 export interface DadosAtualizacaoProduto {
@@ -42,6 +45,8 @@ export interface DadosAtualizacaoProduto {
   alturaCm?: number;
   larguraCm?: number;
   comprimentoCm?: number;
+  /** undefined = não mexe no campo; null = remove a promoção (volta pro preço normal). */
+  precoPromocional?: number | null;
 }
 
 export interface ItemParaDecrementarEstoque {
@@ -62,6 +67,13 @@ export interface ItemParaAjustarEstoque {
 export abstract class ProdutoRepository {
   abstract listarTodos(): Promise<Produto[]>;
   abstract listarComFiltros(filtros: FiltrosListagemProdutos): Promise<ResultadoPaginado<Produto>>;
+  /**
+   * Produtos ativos ordenados por quantidade total vendida (soma de ItemPedido.quantidade
+   * em pedidos PAGO/SEPARACAO/ENVIADO/ENTREGUE — CRIADO/AGUARDANDO_CONTATO/AGUARDANDO_PAGAMENTO
+   * e CANCELADO/ESTORNADO não contam como venda: o primeiro grupo nunca chegou a ser pago,
+   * o segundo foi revertido). Produtos sem nenhuma venda nesse critério não entram na lista.
+   */
+  abstract listarMaisVendidos(limite: number): Promise<Produto[]>;
   abstract buscarPorId(id: string): Promise<Produto | null>;
   abstract buscarPorIds(ids: string[]): Promise<Produto[]>;
   abstract buscarPorSlug(slug: string): Promise<Produto | null>;

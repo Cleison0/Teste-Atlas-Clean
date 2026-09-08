@@ -22,6 +22,16 @@ function criarProduto(overrides: Partial<Produto> = {}): Produto {
     overrides.ativo ?? true,
     overrides.descricao,
     overrides.categoria,
+    overrides.createdAt,
+    overrides.updatedAt,
+    overrides.pesoKg,
+    overrides.alturaCm,
+    overrides.larguraCm,
+    overrides.comprimentoCm,
+    overrides.pack,
+    overrides.marca,
+    overrides.produtoTipo,
+    overrides.precoPromocional,
   );
 }
 
@@ -98,6 +108,17 @@ describe('MontarCarrinhoUseCase', () => {
       precoUnitario: 10,
     });
     expect(carrinho.total).toBe(45.9);
+  });
+
+  it('usa o preço promocional (não o normal) quando o produto está em promoção', async () => {
+    produtoRepository.buscarPorIds.mockResolvedValue([
+      criarProduto({ id: 'produto-1', preco: 10, precoPromocional: 7, estoque: 5 }),
+    ]);
+
+    const carrinho = await useCase.executar([{ produtoId: 'produto-1', quantidade: 2 }]);
+
+    expect(carrinho.itens[0].precoUnitario).toBe(7);
+    expect(carrinho.total).toBe(14);
   });
 
   it('consolida quantidades do mesmo produto pedido em mais de uma linha', async () => {

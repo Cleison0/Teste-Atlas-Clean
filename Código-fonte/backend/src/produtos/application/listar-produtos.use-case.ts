@@ -14,6 +14,7 @@ export class ListarProdutosUseCase {
       busca: query.busca,
       categoria: query.categoria,
       ativo: query.ativo !== undefined ? query.ativo === 'true' : undefined,
+      emPromocao: query.emPromocao !== undefined ? query.emPromocao === 'true' : undefined,
       ordenarPor: query.ordenarPor,
       direcao: query.direcao,
     });

@@ -7,6 +7,9 @@ const NOMES: Record<string, string> = {
   papelaria: 'Papelaria',
 };
 
+// Estoque/preço/ativo mudam via admin a qualquer momento — revalidate curto.
+const REVALIDATE_SEGUNDOS = 120;
+
 export interface CategorySectionProps {
   categoria: 'limpeza' | 'descartaveis' | 'papelaria';
   numero: string;
@@ -20,7 +23,18 @@ export async function CategorySection({
   indice,
   total: totalCategorias,
 }: CategorySectionProps) {
-  const { itens, total } = await listarProdutos({ pagina: 1, limite: 200, categoria });
+  let itens, total;
+  try {
+    const resultado = await listarProdutos(
+      { pagina: 1, limite: 200, categoria },
+      { next: { revalidate: REVALIDATE_SEGUNDOS } },
+    );
+    itens = resultado.itens;
+    total = resultado.total;
+  } catch {
+    // Isolado: se /produtos falhar pra essa categoria, some só esse bloco — o resto da home segue.
+    return null;
+  }
 
   return (
     <section id={categoria} className="relative mx-auto max-w-[1180px] px-5 py-10">

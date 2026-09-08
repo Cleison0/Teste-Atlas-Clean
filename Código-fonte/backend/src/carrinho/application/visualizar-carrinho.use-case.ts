@@ -103,12 +103,13 @@ export class VisualizarCarrinhoUseCase {
         continue;
       }
 
-      const subtotal = Number((produto.preco * item.quantidade).toFixed(2));
+      const precoUnitario = produto.precoEfetivo();
+      const subtotal = Number((precoUnitario * item.quantidade).toFixed(2));
       itens.push({
         produtoId: produto.id,
         nome: produto.nome,
         quantidade: item.quantidade,
-        precoUnitario: produto.preco,
+        precoUnitario,
         subtotal,
         disponivel: produto.estoque >= item.quantidade,
         estoqueDisponivel: produto.estoque,

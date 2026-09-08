@@ -33,6 +33,12 @@ function formInicial(produto: ProdutoAdmin | null | undefined): DadosProdutoForm
     : { nome: '', descricao: '', categoria: '', preco: 0, estoque: 0 };
 }
 
+/** Preço promocional é editado à parte, como texto: um <Input type="number"> não tem
+ * como representar "vazio" de forma limpa se o valor for number|null|undefined direto. */
+function precoPromocionalTextoInicial(produto: ProdutoAdmin | null | undefined): string {
+  return produto?.precoPromocional !== undefined ? String(produto.precoPromocional) : '';
+}
+
 export function ProdutoFormModal({ produto, aberto, onClose }: ProdutoFormModalProps) {
   const editando = !!produto;
 
@@ -64,10 +70,28 @@ function ProdutoForm({
   const { showToast } = useToast();
   const editando = !!produto;
   const [form, setForm] = useState<DadosProdutoForm>(() => formInicial(produto));
+  const [precoPromocionalTexto, setPrecoPromocionalTexto] = useState(() =>
+    precoPromocionalTextoInicial(produto),
+  );
+  const precoPromocionalInvalido =
+    precoPromocionalTexto.trim() !== '' && Number(precoPromocionalTexto) >= form.preco;
 
   const mutation = useMutation({
-    mutationFn: () =>
-      editando ? atualizarProdutoAdmin(produto!.id, form) : criarProdutoAdmin(form),
+    mutationFn: () => {
+      // Vazio: na criação simplesmente não manda o campo (sem promoção); na edição,
+      // manda `null` só se havia uma promoção antes, pra pedir a remoção explícita —
+      // enviar `null` sempre criaria um produto novo com precoPromocional: null, que
+      // o backend rejeita (CriarProdutoDto não aceita null, só number|undefined).
+      const precoPromocional =
+        precoPromocionalTexto.trim() === ''
+          ? editando && produto?.precoPromocional !== undefined
+            ? null
+            : undefined
+          : Number(precoPromocionalTexto);
+      const dados: DadosProdutoForm = { ...form, precoPromocional };
+
+      return editando ? atualizarProdutoAdmin(produto!.id, dados) : criarProdutoAdmin(dados);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'produtos'] });
       showToast(editando ? 'Produto atualizado.' : 'Produto criado.', 'success');
@@ -116,6 +140,16 @@ function ProdutoForm({
           onChange={(e) => setForm({ ...form, estoque: Number(e.target.value) })}
         />
       </div>
+      <Input
+        label="Preço promocional (R$)"
+        type="number"
+        step="0.01"
+        min={0}
+        placeholder="Deixe em branco pra não ter promoção"
+        value={precoPromocionalTexto}
+        onChange={(e) => setPrecoPromocionalTexto(e.target.value)}
+        error={precoPromocionalInvalido ? 'Precisa ser menor que o preço normal.' : undefined}
+      />
       <label className="flex flex-col gap-1.5">
         <span className="text-[13px] font-semibold text-navy">Descrição</span>
         <textarea
@@ -124,7 +158,11 @@ function ProdutoForm({
           className="min-h-20 rounded-atlas-sm border border-line bg-white px-3.5 py-2.5 font-sans text-[13px] text-ink focus:outline-none focus:ring-2 focus:ring-blue/40"
         />
       </label>
-      <Button type="submit" disabled={mutation.isPending} className="mt-1">
+      <Button
+        type="submit"
+        disabled={mutation.isPending || precoPromocionalInvalido}
+        className="mt-1"
+      >
         {mutation.isPending ? 'Salvando…' : editando ? 'Salvar' : 'Criar'}
       </Button>
     </form>

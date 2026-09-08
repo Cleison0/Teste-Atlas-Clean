@@ -81,7 +81,7 @@ export class RepetirPedidoUseCase {
         produtoId: produto.id,
         nome: produto.nome,
         quantidade: quantidadeDisponivel,
-        precoUnitario: produto.preco,
+        precoUnitario: produto.precoEfetivo(),
         ajustado: quantidadeDisponivel < item.quantidade,
       });
     }

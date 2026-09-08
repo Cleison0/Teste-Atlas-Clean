@@ -31,10 +31,24 @@ export class Produto {
     public readonly pack?: string,
     public readonly marca?: MarcaDoProduto,
     public readonly produtoTipo?: ProdutoTipoDoProduto,
+    public readonly precoPromocional?: number,
   ) {}
 
   possuiEstoqueDisponivel(quantidade: number): boolean {
     return this.estoque >= quantidade;
+  }
+
+  /** Promoção ativa = tem preço promocional cadastrado (a invariante de que ele é
+   * menor que o preço normal é garantida na escrita, não precisa reconferir aqui). */
+  estaEmPromocao(): boolean {
+    return this.precoPromocional !== undefined;
+  }
+
+  /** Preço que efetivamente é cobrado — o promocional quando existe, senão o normal.
+   * Único preço que carrinho/pedido devem usar (nunca `preco` direto), senão a
+   * promoção que aparece na vitrine não bate com o que é cobrado no checkout. */
+  precoEfetivo(): number {
+    return this.precoPromocional ?? this.preco;
   }
 
   /** Retorna uma cópia da entidade com o produto ativado. */
@@ -57,6 +71,7 @@ export class Produto {
       this.pack,
       this.marca,
       this.produtoTipo,
+      this.precoPromocional,
     );
   }
 
@@ -80,6 +95,7 @@ export class Produto {
       this.pack,
       this.marca,
       this.produtoTipo,
+      this.precoPromocional,
     );
   }
 }

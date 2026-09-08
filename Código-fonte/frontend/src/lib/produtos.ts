@@ -21,6 +21,8 @@ export interface Produto {
   descricao?: string;
   categoria?: string;
   preco: number;
+  /** Presente só quando há promoção ativa (sempre menor que `preco`). */
+  precoPromocional?: number;
   estoque: number;
   ativo: boolean;
   pack?: string;
@@ -46,12 +48,18 @@ export interface ImagemProduto {
 }
 
 // Loja pública: sempre ativo=true, diferente do admin (que precisa ver inativos também).
-export function listarProdutos(params: {
-  pagina: number;
-  limite: number;
-  busca?: string;
-  categoria?: string;
-}): Promise<ProdutoPaginado> {
+export function listarProdutos(
+  params: {
+    pagina: number;
+    limite: number;
+    busca?: string;
+    categoria?: string;
+    emPromocao?: boolean;
+    ordenarPor?: 'nome' | 'preco' | 'createdAt';
+    direcao?: 'asc' | 'desc';
+  },
+  opcoes?: { next?: { revalidate?: number } },
+): Promise<ProdutoPaginado> {
   const query = new URLSearchParams({
     pagina: String(params.pagina),
     limite: String(params.limite),
@@ -59,7 +67,18 @@ export function listarProdutos(params: {
   });
   if (params.busca) query.set('busca', params.busca);
   if (params.categoria) query.set('categoria', params.categoria);
-  return api.get<ProdutoPaginado>(`/produtos?${query.toString()}`);
+  if (params.emPromocao) query.set('emPromocao', 'true');
+  if (params.ordenarPor) query.set('ordenarPor', params.ordenarPor);
+  if (params.direcao) query.set('direcao', params.direcao);
+  return api.get<ProdutoPaginado>(`/produtos?${query.toString()}`, opcoes);
+}
+
+// Sem paginação de propósito — é sempre um "top N" curto, mesmo padrão de /marcas.
+export function listarProdutosMaisVendidos(
+  limite: number,
+  opcoes?: { next?: { revalidate?: number } },
+): Promise<Produto[]> {
+  return api.get<Produto[]>(`/produtos/mais-vendidos?limite=${limite}`, opcoes);
 }
 
 export function listarImagensProduto(produtoId: string): Promise<ImagemProduto[]> {

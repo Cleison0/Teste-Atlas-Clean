@@ -1,10 +1,14 @@
 import { Produto } from '../domain/produto.entity';
 import { ProdutoRepository } from '../domain/produto.repository';
-import { ProdutoNaoEncontradoException } from '../domain/produtos.exceptions';
+import {
+  PrecoPromocionalInvalidoException,
+  ProdutoNaoEncontradoException,
+} from '../domain/produtos.exceptions';
 import { AlternarStatusProdutoUseCase } from './alternar-status-produto.use-case';
 import { AtualizarProdutoUseCase } from './atualizar-produto.use-case';
 import { CriarProdutoUseCase } from './criar-produto.use-case';
 import { ListarProdutosUseCase } from './listar-produtos.use-case';
+import { ListarProdutosMaisVendidosUseCase } from './listar-produtos-mais-vendidos.use-case';
 
 function criarProduto(overrides: Partial<Produto> = {}): Produto {
   return new Produto(
@@ -65,6 +69,25 @@ describe('CriarProdutoUseCase', () => {
       }),
     );
     expect(result.slug).toBe('detergente-2');
+  });
+
+  it('rejeita preço promocional maior ou igual ao preço normal', async () => {
+    await expect(
+      useCase.executar({ nome: 'Detergente', preco: 20, precoPromocional: 20 }),
+    ).rejects.toThrow(PrecoPromocionalInvalidoException);
+
+    expect(produtoRepository.criar).not.toHaveBeenCalled();
+  });
+
+  it('aceita preço promocional válido e repassa pro repositório', async () => {
+    produtoRepository.buscarPorSlug.mockResolvedValue(null);
+    produtoRepository.criar.mockResolvedValue(criarProduto());
+
+    await useCase.executar({ nome: 'Detergente', preco: 20, precoPromocional: 15 });
+
+    expect(produtoRepository.criar).toHaveBeenCalledWith(
+      expect.objectContaining({ precoPromocional: 15 }),
+    );
   });
 });
 
@@ -130,6 +153,37 @@ describe('AtualizarProdutoUseCase', () => {
         nome: 'Limpeza eficiente',
         slug: 'limpeza-eficiente-2',
       }),
+    );
+  });
+
+  it('rejeita preço promocional maior ou igual ao preço enviado no dto', async () => {
+    produtoRepository.buscarPorId.mockResolvedValue(criarProduto({ preco: 50 }));
+
+    await expect(useCase.executar('prod-1', { preco: 30, precoPromocional: 30 })).rejects.toThrow(
+      PrecoPromocionalInvalidoException,
+    );
+
+    expect(produtoRepository.atualizar).not.toHaveBeenCalled();
+  });
+
+  it('rejeita preço promocional maior ou igual ao preço existente quando preco não vem no dto', async () => {
+    produtoRepository.buscarPorId.mockResolvedValue(criarProduto({ preco: 20 }));
+
+    await expect(useCase.executar('prod-1', { precoPromocional: 25 })).rejects.toThrow(
+      PrecoPromocionalInvalidoException,
+    );
+  });
+
+  it('permite null pra remover a promoção sem validar contra o preço', async () => {
+    const existente = criarProduto({ preco: 20 });
+    produtoRepository.buscarPorId.mockResolvedValue(existente);
+    produtoRepository.atualizar.mockResolvedValue(existente);
+
+    await useCase.executar('prod-1', { precoPromocional: null });
+
+    expect(produtoRepository.atualizar).toHaveBeenCalledWith(
+      'prod-1',
+      expect.objectContaining({ precoPromocional: null }),
     );
   });
 });
@@ -233,5 +287,34 @@ describe('ListarProdutosUseCase', () => {
       direcao: 'asc',
     });
     expect(resultado).toEqual(lista);
+  });
+
+  it('converte emPromocao de string pra boolean', async () => {
+    produtoRepository.listarComFiltros.mockResolvedValue({
+      itens: [],
+      total: 0,
+      pagina: 1,
+      limite: 10,
+    });
+
+    await useCase.executar({ pagina: 1, limite: 10, emPromocao: 'true' } as any);
+
+    expect(produtoRepository.listarComFiltros).toHaveBeenCalledWith(
+      expect.objectContaining({ emPromocao: true }),
+    );
+  });
+});
+
+describe('ListarProdutosMaisVendidosUseCase', () => {
+  it('repassa o limite pro repositório e devolve o resultado', async () => {
+    const produtoRepository = {
+      listarMaisVendidos: jest.fn().mockResolvedValue([criarProduto()]),
+    } as unknown as jest.Mocked<ProdutoRepository>;
+    const useCase = new ListarProdutosMaisVendidosUseCase(produtoRepository);
+
+    const resultado = await useCase.executar(5);
+
+    expect(produtoRepository.listarMaisVendidos).toHaveBeenCalledWith(5);
+    expect(resultado).toHaveLength(1);
   });
 });
