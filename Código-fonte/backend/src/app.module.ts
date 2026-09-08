@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+﻿import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { ScheduleModule } from '@nestjs/schedule';
@@ -17,6 +17,9 @@ import { FreteModule } from './frete/infrastructure/frete.module';
 import { CuponsModule } from './cupons/infrastructure/cupons.module';
 import { BannersModule } from './banners/infrastructure/banners.module';
 import { ResenhasModule } from './resenhas/infrastructure/resenhas.module';
+import { ObservabilityModule } from './shared/observability/observability.module';
+import { HealthModule } from './health/health.module';
+
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -24,12 +27,11 @@ import { ResenhasModule } from './resenhas/infrastructure/resenhas.module';
       validationSchema: envValidationSchema,
       validationOptions: { abortEarly: false },
     }),
-    // Limite padrão pra API inteira; rotas sensíveis (ex: login) sobrescrevem
-    // com @Throttle() um limite mais estrito.
     ThrottlerModule.forRoot([{ name: 'default', ttl: 60_000, limit: 60 }]),
-    // Habilita @Cron — usado hoje só pelo job de reconciliação de pagamentos pendentes.
     ScheduleModule.forRoot(),
     PrismaModule,
+    ObservabilityModule,
+    HealthModule,
     ProdutosModule,
     CategoriasModule,
     MarcasModule,
@@ -43,6 +45,11 @@ import { ResenhasModule } from './resenhas/infrastructure/resenhas.module';
     BannersModule,
     ResenhasModule,
   ],
-  providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
+  providers: [
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
+  ],
 })
 export class AppModule {}

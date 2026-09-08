@@ -1,18 +1,34 @@
-import 'reflect-metadata';
-import { NestFactory } from '@nestjs/core';
+﻿import 'reflect-metadata';
 import { ValidationPipe } from '@nestjs/common';
+import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import helmet from 'helmet';
 import { AppModule } from './app.module';
-import { DomainExceptionFilter } from './shared/exceptions/domain-exception.filter';
 import { validarCorsOrigin } from './shared/config/validar-cors-origin';
+import { GlobalExceptionFilter } from './shared/observability/global-exception.filter';
+import { PinoLoggerService } from './shared/observability/pino-logger.service';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, {
+    bufferLogs: true,
+  });
+
+  const logger = app.get(PinoLoggerService);
+  app.useLogger(logger);
+
+  app.use(helmet());
 
   const corsOrigin = process.env.CORS_ORIGIN;
   validarCorsOrigin(corsOrigin, process.env.NODE_ENV);
+
   app.enableCors({
-    origin: corsOrigin ? corsOrigin.split(',') : true,
+    origin: corsOrigin
+      ? corsOrigin
+          .split(',')
+          .map((origin) => origin.trim())
+          .filter(Boolean)
+      : true,
+    credentials: true,
   });
 
   app.useGlobalPipes(
@@ -22,21 +38,28 @@ async function bootstrap() {
       transform: true,
     }),
   );
-  app.useGlobalFilters(new DomainExceptionFilter());
+
+  app.useGlobalFilters(new GlobalExceptionFilter(logger));
 
   const swaggerConfig = new DocumentBuilder()
-    .setTitle('Atlas Nova Clean — API')
+    .setTitle('Atlas Nova Clean - API')
     .setDescription(
-      'API do e-commerce Atlas Nova Clean: catálogo de produtos, carrinho, pedidos e pagamentos (Mercado Pago).',
+      'API do e-commerce Atlas Nova Clean: catalogo de produtos, carrinho, pedidos e pagamentos.',
     )
     .setVersion('1.0')
     .addBearerAuth({ type: 'http', scheme: 'bearer', bearerFormat: 'JWT' }, 'access-token')
     .build();
+
   const swaggerDocument = SwaggerModule.createDocument(app, swaggerConfig);
   SwaggerModule.setup('api/docs', app, swaggerDocument);
 
   const port = process.env.PORT ?? 3000;
   await app.listen(port);
+
+  logger.log({
+    event: 'application_started',
+    port,
+  });
 }
 
 bootstrap();
