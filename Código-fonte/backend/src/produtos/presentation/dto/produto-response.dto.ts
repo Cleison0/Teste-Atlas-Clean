@@ -18,6 +18,16 @@ class ProdutoTipoDoProdutoResponseDto {
 
   @ApiProperty({ example: 'Detergente para Louça' })
   nome!: string;
+
+  @ApiPropertyOptional({
+    example: 'Detergente concentrado neutro, indicado para louças e utensílios.',
+  })
+  infoTecnica?: string;
+
+  @ApiPropertyOptional({
+    example: 'Manter fora do alcance de crianças. Evitar contato com os olhos.',
+  })
+  precaucoes?: string;
 }
 
 export class ProdutoResponseDto {

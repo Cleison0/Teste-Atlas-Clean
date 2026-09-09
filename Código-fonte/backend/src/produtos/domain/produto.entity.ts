@@ -10,6 +10,10 @@ export interface MarcaDoProduto {
 export interface ProdutoTipoDoProduto {
   slug: string;
   nome: string;
+  /** Texto técnico/precauções padrão do tipo — ver ProdutoTipo no schema. Nem todo
+   * tipo tem esse conteúdo cadastrado ainda. */
+  infoTecnica?: string;
+  precaucoes?: string;
 }
 
 export class Produto {

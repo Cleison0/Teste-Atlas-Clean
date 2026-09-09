@@ -7,11 +7,8 @@ import { Badge } from '@/components/ui/Badge';
 import { useToast } from '@/components/ui/Toast';
 import { useImagemPrincipal } from '@/hooks/use-imagem-principal';
 import { corDaCategoria } from '@/lib/categoria-visual';
+import { PrecoProduto } from './PrecoProduto';
 import type { Produto } from '@/lib/produtos';
-
-function formatarMoeda(valor: number): string {
-  return valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-}
 
 export interface ProductCardProps {
   produto: Produto;
@@ -89,20 +86,7 @@ export function ProductCard({ produto, indice = 0 }: ProductCardProps) {
         {produto.pack && <p className="text-[12px] text-muted">{produto.pack}</p>}
 
         <div className="mt-auto flex items-center justify-between pt-2">
-          {emPromocao ? (
-            <span className="flex flex-col">
-              <span className="font-mono text-[11px] text-muted line-through">
-                {formatarMoeda(produto.preco)}
-              </span>
-              <span className="font-mono text-[14px] font-bold text-green">
-                {formatarMoeda(produto.precoPromocional!)}
-              </span>
-            </span>
-          ) : (
-            <span className="font-mono text-[14px] font-bold text-navy">
-              {formatarMoeda(produto.preco)}
-            </span>
-          )}
+          <PrecoProduto preco={produto.preco} precoPromocional={produto.precoPromocional} />
           {noCarrinho ? (
             <Stepper
               quantidade={noCarrinho.quantidade}
