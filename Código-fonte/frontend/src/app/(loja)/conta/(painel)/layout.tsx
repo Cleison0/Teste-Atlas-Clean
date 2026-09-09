@@ -3,7 +3,9 @@
 import { ReactNode, useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useQueryClient } from '@tanstack/react-query';
 import { limparSessaoCliente, obterSessaoCliente, type SessaoCliente } from '@/lib/conta-auth';
+import { CHAVE_QUERY_CARRINHO } from '@/lib/cart-context';
 
 const ITENS_NAV = [
   { href: '/conta', label: 'Dados cadastrais' },
@@ -18,6 +20,7 @@ const ITENS_NAV = [
 export default function ContaPainelLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
+  const queryClient = useQueryClient();
   const [sessao, setSessao] = useState<SessaoCliente | null | undefined>(undefined);
 
   useEffect(() => {
@@ -32,6 +35,11 @@ export default function ContaPainelLayout({ children }: { children: ReactNode })
 
   function sair() {
     limparSessaoCliente();
+    // Sem isso, o header continuaria mostrando o carrinho do cliente que acabou de
+    // sair até alguma outra ação disparar um refetch (mesmo motivo do login/registro
+    // — ver conta/entrar/page.tsx). Depois do logout, o carrinho passa a ser
+    // resolvido só pelo sessionToken anônimo (X-Cart-Session).
+    void queryClient.invalidateQueries({ queryKey: CHAVE_QUERY_CARRINHO });
     router.replace('/conta/entrar');
   }
 

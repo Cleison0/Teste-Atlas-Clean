@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
 import { Stepper } from '@/components/ui/Stepper';
+import { CarrinhoItemImagem } from '@/components/loja/CarrinhoItemImagem';
 import { useCart } from '@/lib/cart-context';
 
 const TRUST_BADGES = [
@@ -104,6 +105,7 @@ export function CartDrawer() {
                     key={item.produtoId}
                     className="flex items-center justify-between gap-2.5 border-b border-dashed border-line py-3.5 last:border-b-0"
                   >
+                    <CarrinhoItemImagem produtoId={item.produtoId} nome={item.nome} tamanho={48} />
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-[13px] font-semibold text-navy">{item.nome}</p>
                       <p className="font-mono text-[11.5px] text-muted">
@@ -158,6 +160,13 @@ export function CartDrawer() {
             >
               Continuar para o checkout
             </Button>
+            <Link
+              href="/carrinho"
+              onClick={fecharDrawer}
+              className="mt-2.5 block text-center text-[12.5px] font-semibold text-blue hover:underline"
+            >
+              Ver carrinho completo
+            </Link>
             <p className="mt-2 text-center text-[11px] text-muted">
               Frete calculado no checkout, de acordo com a entrega escolhida.
             </p>
