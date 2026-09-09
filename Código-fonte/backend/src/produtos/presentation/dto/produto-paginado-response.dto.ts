@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { ResultadoPaginado } from '../../domain/produto.repository';
 import { Produto } from '../../domain/produto.entity';
 import { ProdutoResponseDto } from './produto-response.dto';
@@ -19,6 +19,16 @@ export class ProdutoPaginadoResponseDto {
   @ApiProperty({ example: 5 })
   totalPaginas: number;
 
+  @ApiPropertyOptional({
+    example: 5.9,
+    description:
+      'Menor preço entre os produtos que batem com os filtros atuais (exceto precoMin/precoMax). undefined se não há nenhum produto no escopo.',
+  })
+  precoMinCatalogo?: number;
+
+  @ApiPropertyOptional({ example: 189.9 })
+  precoMaxCatalogo?: number;
+
   static fromDomain(resultado: ResultadoPaginado<Produto>): ProdutoPaginadoResponseDto {
     const dto = new ProdutoPaginadoResponseDto();
     dto.itens = resultado.itens.map(ProdutoResponseDto.fromDomain);
@@ -26,6 +36,8 @@ export class ProdutoPaginadoResponseDto {
     dto.pagina = resultado.pagina;
     dto.limite = resultado.limite;
     dto.totalPaginas = Math.max(1, Math.ceil(resultado.total / resultado.limite));
+    dto.precoMinCatalogo = resultado.precoMinCatalogo;
+    dto.precoMaxCatalogo = resultado.precoMaxCatalogo;
     return dto;
   }
 }

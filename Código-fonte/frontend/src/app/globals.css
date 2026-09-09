@@ -94,3 +94,34 @@ body {
   background: var(--color-paper);
   color: var(--color-ink);
 }
+
+/* Slider de faixa de preço (CatalogoFaixaPreco): dois <input type="range">
+   sobrepostos na mesma trilha, com pointer-events desligado no input inteiro
+   (senão o de cima bloquearia cliques no de baixo) e religado só no thumb —
+   assim os dois continuam arrastáveis independentemente. */
+.range-thumb-only::-webkit-slider-thumb {
+  pointer-events: auto;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 9999px;
+  background: var(--color-navy);
+  border: 2px solid white;
+  box-shadow: var(--shadow-atlas);
+  cursor: pointer;
+}
+
+.range-thumb-only::-moz-range-thumb {
+  pointer-events: auto;
+  width: 16px;
+  height: 16px;
+  border-radius: 9999px;
+  background: var(--color-navy);
+  border: 2px solid white;
+  box-shadow: var(--shadow-atlas);
+  cursor: pointer;
+}
+
+.range-thumb-only::-moz-range-track {
+  background: transparent;
+}

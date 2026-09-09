@@ -1,40 +1,24 @@
-import { listarProdutos } from '@/lib/produtos';
-import { CategoryGrid } from '@/components/loja/CategoryGrid';
+import { Suspense } from 'react';
+import { CatalogoPagina } from '@/components/loja/catalogo/CatalogoPagina';
+import { ProductGridSkeleton } from '@/components/ui/Skeleton';
 
-// Destino da busca do header (form action="/catalogo", input name="q") e também a
-// vitrine completa (sem filtro de categoria) — mesmo CategoryGrid da Home, pra não
-// ter duas experiências de navegação diferentes pro mesmo catálogo.
-export const dynamic = 'force-dynamic';
-
-const NOMES_CATEGORIA: Record<string, string> = {
-  limpeza: 'Limpeza',
-  descartaveis: 'Descartáveis',
-  papelaria: 'Papelaria',
-};
-
-export default async function CatalogoPage({ searchParams }: PageProps<'/catalogo'>) {
-  const { q, categoria } = await searchParams;
-  const busca = typeof q === 'string' && q.trim() ? q.trim() : undefined;
-  const categoriaFiltro =
-    typeof categoria === 'string' && categoria.trim() ? categoria.trim() : undefined;
-  const { itens, total } = await listarProdutos({
-    pagina: 1,
-    limite: 200,
-    busca,
-    categoria: categoriaFiltro,
-  });
-
-  const titulo = busca
-    ? `Resultados para "${busca}"`
-    : categoriaFiltro
-      ? (NOMES_CATEGORIA[categoriaFiltro] ?? categoriaFiltro)
-      : 'Catálogo completo';
-
+// A listagem em si é toda client-side (React Query + useSearchParams) — filtro,
+// busca, ordenação e paginação precisam atualizar a URL e refazer a query sem
+// recarregar a página inteira, com cache por combinação de filtros e cancelamento
+// da requisição anterior, o que useSearchParams + React Query resolvem de forma
+// mais direta que um Server Component recarregando a cada mudança. O Suspense aqui
+// é exigido pelo Next pra usar useSearchParams num componente que pode ser
+// pré-renderizado estaticamente — sem ele o build reclama.
+export default function CatalogoPage() {
   return (
-    <main className="mx-auto max-w-[1180px] px-5 py-10">
-      <h1 className="mb-1 font-display text-2xl font-bold text-navy">{titulo}</h1>
-      <p className="mb-6 text-[13px] text-muted">{total} produtos</p>
-      <CategoryGrid produtos={itens} />
-    </main>
+    <Suspense
+      fallback={
+        <main className="mx-auto max-w-[1180px] px-5 py-10">
+          <ProductGridSkeleton quantidade={12} />
+        </main>
+      }
+    >
+      <CatalogoPagina />
+    </Suspense>
   );
 }

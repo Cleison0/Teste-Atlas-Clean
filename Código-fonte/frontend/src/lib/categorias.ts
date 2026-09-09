@@ -6,9 +6,10 @@ export interface Categoria {
   nome: string;
 }
 
-// GET /categorias é público (a loja usa pros atalhos de categoria na home).
+// GET /categorias é público (a loja usa pros atalhos de categoria na home e no catálogo).
 export function listarCategorias(opcoes?: {
   next?: { revalidate?: number };
+  signal?: AbortSignal;
 }): Promise<Categoria[]> {
   return api.get<Categoria[]>('/categorias', opcoes);
 }

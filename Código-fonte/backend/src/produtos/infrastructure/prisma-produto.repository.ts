@@ -56,27 +56,51 @@ export class PrismaProdutoRepository extends ProdutoRepository {
       limite,
       busca,
       categoria,
+      marcaId,
+      produtoTipoSlug,
+      categorias,
+      marcaIds,
+      precoMin,
+      precoMax,
+      disponivel,
       ativo,
       emPromocao,
       ordenarPor = 'createdAt',
       direcao = 'desc',
     } = filtros;
 
-    const where: Prisma.ProdutoWhereInput = {};
+    const whereSemFaixaPreco: Prisma.ProdutoWhereInput = {};
 
     if (busca) {
-      where.OR = [
+      whereSemFaixaPreco.OR = [
         { nome: { contains: busca, mode: 'insensitive' } },
         { descricao: { contains: busca, mode: 'insensitive' } },
       ];
     }
-    if (categoria) where.categoria = categoria;
-    if (ativo !== undefined) where.ativo = ativo;
+    // `categoria`/`marcaId` (singular) e `categorias`/`marcaIds` (plural) são
+    // dimensões independentes — quem chama usa um ou outro, nunca os dois pro
+    // mesmo filtro. `in` já expressa "qualquer uma destas" sem precisar de OR
+    // (que já está ocupado por `busca` acima).
+    if (categoria) whereSemFaixaPreco.categoria = categoria;
+    if (marcaId) whereSemFaixaPreco.marcaId = marcaId;
+    if (produtoTipoSlug) whereSemFaixaPreco.produtoTipo = { slug: produtoTipoSlug };
+    if (categorias && categorias.length > 0) whereSemFaixaPreco.categoria = { in: categorias };
+    if (marcaIds && marcaIds.length > 0) whereSemFaixaPreco.marcaId = { in: marcaIds };
+    if (disponivel) whereSemFaixaPreco.estoque = { gt: 0 };
+    if (ativo !== undefined) whereSemFaixaPreco.ativo = ativo;
     // A invariante precoPromocional < preco é garantida na escrita (use case), então
     // "tem promoção ativa" aqui é só "o campo está preenchido".
-    if (emPromocao) where.precoPromocional = { not: null };
+    if (emPromocao) whereSemFaixaPreco.precoPromocional = { not: null };
 
-    const [produtos, total] = await this.prisma.$transaction([
+    const where: Prisma.ProdutoWhereInput = { ...whereSemFaixaPreco };
+    if (precoMin !== undefined || precoMax !== undefined) {
+      where.preco = {
+        ...(precoMin !== undefined ? { gte: precoMin } : {}),
+        ...(precoMax !== undefined ? { lte: precoMax } : {}),
+      };
+    }
+
+    const [produtos, total, faixaPreco] = await this.prisma.$transaction([
       this.prisma.produto.findMany({
         where,
         skip: (pagina - 1) * limite,
@@ -85,6 +109,15 @@ export class PrismaProdutoRepository extends ProdutoRepository {
         include: INCLUDE_RELACOES,
       }),
       this.prisma.produto.count({ where }),
+      // Ignora precoMin/precoMax de propósito — os limites do slider não podem
+      // encolher conforme o próprio slider é usado. Os outros filtros (categoria,
+      // marca, busca, disponibilidade) continuam valendo, pra refletir a faixa real
+      // do recorte atual.
+      this.prisma.produto.aggregate({
+        where: whereSemFaixaPreco,
+        _min: { preco: true },
+        _max: { preco: true },
+      }),
     ]);
 
     return {
@@ -92,6 +125,8 @@ export class PrismaProdutoRepository extends ProdutoRepository {
       total,
       pagina,
       limite,
+      precoMinCatalogo: faixaPreco._min.preco !== null ? Number(faixaPreco._min.preco) : undefined,
+      precoMaxCatalogo: faixaPreco._max.preco !== null ? Number(faixaPreco._max.preco) : undefined,
     };
   }
 
@@ -251,7 +286,14 @@ export class PrismaProdutoRepository extends ProdutoRepository {
       marca
         ? { id: marca.id, nome: marca.nome, imagemUrl: marca.imagemUrl ?? undefined }
         : undefined,
-      produtoTipo?.slug ? { slug: produtoTipo.slug, nome: produtoTipo.nome } : undefined,
+      produtoTipo?.slug
+        ? {
+            slug: produtoTipo.slug,
+            nome: produtoTipo.nome,
+            infoTecnica: produtoTipo.infoTecnica ?? undefined,
+            precaucoes: produtoTipo.precaucoes ?? undefined,
+          }
+        : undefined,
       produto.precoPromocional !== null ? Number(produto.precoPromocional) : undefined,
     );
   }
