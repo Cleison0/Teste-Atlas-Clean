@@ -19,6 +19,9 @@ import { CuponsModule } from './cupons/infrastructure/cupons.module';
 import { BannersModule } from './banners/infrastructure/banners.module';
 import { ResenhasModule } from './resenhas/infrastructure/resenhas.module';
 import { EmailsModule } from './emails/infrastructure/emails.module';
+import { ObservabilityModule } from './shared/observability/observability.module';
+import { HealthModule } from './health/health.module';
+
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -26,10 +29,7 @@ import { EmailsModule } from './emails/infrastructure/emails.module';
       validationSchema: envValidationSchema,
       validationOptions: { abortEarly: false },
     }),
-    // Limite padrão pra API inteira; rotas sensíveis (ex: login) sobrescrevem
-    // com @Throttle() um limite mais estrito.
     ThrottlerModule.forRoot([{ name: 'default', ttl: 60_000, limit: 60 }]),
-    // Habilita @Cron — usado hoje só pelo job de reconciliação de pagamentos pendentes.
     ScheduleModule.forRoot(),
     // maxRetriesPerRequest baixo + offline queue desligada: se o Redis estiver fora do
     // ar (ou não existir, como no ambiente de testes e2e, que não sobe Redis), enfileirar
@@ -48,6 +48,8 @@ import { EmailsModule } from './emails/infrastructure/emails.module';
       }),
     }),
     PrismaModule,
+    ObservabilityModule,
+    HealthModule,
     ProdutosModule,
     CategoriasModule,
     MarcasModule,
@@ -62,6 +64,11 @@ import { EmailsModule } from './emails/infrastructure/emails.module';
     ResenhasModule,
     EmailsModule,
   ],
-  providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
+  providers: [
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
+  ],
 })
 export class AppModule {}

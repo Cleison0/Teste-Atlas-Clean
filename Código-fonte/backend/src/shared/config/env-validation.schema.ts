@@ -17,6 +17,7 @@ export const envValidationSchema = Joi.object({
     .required(),
   JWT_SECRET: Joi.string().min(16).required(),
   PORT: Joi.number().port().default(3000),
+  LOG_LEVEL: Joi.string().valid('fatal', 'error', 'warn', 'info', 'debug', 'trace').optional(),
   CORS_ORIGIN: Joi.string().allow('').optional(),
   MERCADOPAGO_ACCESS_TOKEN: Joi.string().allow('').optional(),
   MERCADOPAGO_WEBHOOK_SECRET: Joi.string().allow('').optional(),
