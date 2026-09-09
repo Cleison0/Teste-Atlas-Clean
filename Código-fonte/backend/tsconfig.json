@@ -16,6 +16,10 @@
     "strictBindCallApply": false,
     "forceConsistentCasingInFileNames": true,
     "noFallthroughCasesInSwitch": false,
-    "esModuleInterop": true
+    "esModuleInterop": true,
+    // Só pros templates de e-mail (emails/infrastructure/templates/*.tsx, React
+    // Email) — nenhuma outra parte do backend usa JSX. "react-jsx" não exige
+    // `import React` em cada arquivo.
+    "jsx": "react-jsx"
   }
 }

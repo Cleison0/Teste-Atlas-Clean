@@ -13,6 +13,7 @@ import { OpcaoFrete } from '../../frete/domain/frete.entity';
 import { ClienteRepository } from '../../clientes/domain/cliente.repository';
 import { ClienteNaoEncontradoException } from '../../clientes/domain/clientes.exceptions';
 import { Cliente } from '../../clientes/domain/cliente.entity';
+import { EmailQueuePort } from '../../emails/domain/email-queue.port';
 import { PedidoRepository } from '../domain/pedido.repository';
 import { ContatoPedido, Pedido } from '../domain/pedido.entity';
 import { StatusPedido } from '../domain/status-pedido.enum';
@@ -22,6 +23,7 @@ describe('CriarPedidoUseCase', () => {
   let calcularFreteUseCase: jest.Mocked<CalcularFreteUseCase>;
   let pedidoRepository: jest.Mocked<PedidoRepository>;
   let clienteRepository: jest.Mocked<ClienteRepository>;
+  let emailQueue: jest.Mocked<EmailQueuePort>;
   let useCase: CriarPedidoUseCase;
 
   const carrinho = new Carrinho([new ItemPrecificado('produto-1', 'Detergente', 2, 10)]);
@@ -74,11 +76,14 @@ describe('CriarPedidoUseCase', () => {
       buscarPorId: jest.fn(),
     } as unknown as jest.Mocked<ClienteRepository>;
 
+    emailQueue = { enfileirar: jest.fn() } as unknown as jest.Mocked<EmailQueuePort>;
+
     useCase = new CriarPedidoUseCase(
       montarCarrinhoUseCase,
       calcularFreteUseCase,
       pedidoRepository,
       clienteRepository,
+      emailQueue,
     );
   });
 
@@ -119,6 +124,10 @@ describe('CriarPedidoUseCase', () => {
       carrinho.desconto,
       carrinho.cupomCodigo,
     );
+    expect(emailQueue.enfileirar).toHaveBeenCalledWith({
+      tipo: 'CONFIRMACAO_PEDIDO',
+      pedidoId: 'pedido-1',
+    });
   });
 
   it('ENTREGA (item único): soma o valor cotado ao total, grava o endereço e passa dados físicos reais pro CalcularFreteUseCase', async () => {

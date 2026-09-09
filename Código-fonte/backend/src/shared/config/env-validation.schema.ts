@@ -32,4 +32,11 @@ export const envValidationSchema = Joi.object({
   FRETE_CEP_ORIGEM: Joi.string().allow('').optional(),
   // Sem valor definido = regra de frete grátis desligada (nenhum pedido se qualifica).
   FRETE_GRATIS_ACIMA_DE: Joi.number().positive().optional(),
+  // E-mails transacionais: mesmo padrão opcional acima — sem RESEND_API_KEY,
+  // NullEmailSenderAdapter assume e só loga (ver emails.module.ts).
+  RESEND_API_KEY: Joi.string().allow('').optional(),
+  EMAIL_FROM: Joi.string().allow('').optional(),
+  FRONTEND_URL: Joi.string().uri().allow('').optional(),
+  REDIS_HOST: Joi.string().allow('').optional(),
+  REDIS_PORT: Joi.number().port().optional(),
 }).unknown(true); // não rejeita outras variáveis de ambiente do sistema (PATH, etc.)

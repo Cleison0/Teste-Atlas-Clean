@@ -36,6 +36,22 @@ services:
     networks:
       - atlas-net
 
+  redis:
+    image: redis:7-alpine
+    container_name: atlas-redis
+    restart: unless-stopped
+    ports:
+      - '${REDIS_PORT:-6379}:6379'
+    volumes:
+      - atlas_redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - atlas-net
+
   api:
     build:
       context: .
@@ -49,6 +65,9 @@ services:
       # Prisma CLI/DBeaver rodando no host) — dentro da rede do compose, o Postgres
       # é acessado pelo nome do serviço, não localhost.
       DATABASE_URL: postgresql://${POSTGRES_USER:-atlas}:${POSTGRES_PASSWORD:-atlas}@postgres:5432/${POSTGRES_DB:-atlas_nova_clean}?schema=public
+      # Idem pro Redis — dentro da rede do compose, acessado pelo nome do serviço.
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
       PORT: ${PORT:-3000}
     ports:
       - '${PORT:-3000}:${PORT:-3000}'
@@ -62,6 +81,8 @@ services:
       - atlas_api_node_modules:/app/node_modules
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     networks:
       - atlas-net
@@ -88,6 +109,8 @@ services:
 volumes:
   atlas_postgres_data:
     name: atlas_postgres_data
+  atlas_redis_data:
+    name: atlas_redis_data
   atlas_api_node_modules:
     name: atlas_api_node_modules
   atlas_pgadmin_data:

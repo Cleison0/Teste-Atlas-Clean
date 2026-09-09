@@ -1,21 +1,52 @@
-// Testes e2e de recuperação de senha contra um Postgres real: solicitar, redefinir
-// com o token, confirmar que o token vira inutilizável depois de usado, e que um
+// Testes e2e de recuperação de senha contra um Postgres real: solicita, redefine
+// com o token, confirma que o token vira inutilizável depois de usado, e que um
 // token inválido/expirado é rejeitado. Arquivo separado de clientes-auth.e2e-spec.ts
 // só pra manter cada arquivo dentro do orçamento de 5 chamadas/60s de POST
 // /auth/clientes/login (esqueci-senha tem o próprio limite separado, por rota).
+//
+// O token não vai mais no corpo da resposta HTTP (ver clientes-auth.controller.ts) —
+// só por e-mail, via fila. Este teste não sobe Redis de verdade (a suíte e2e só
+// provisiona um Postgres embarcado, ver test/setup/global-setup.ts), então
+// EmailQueuePort é substituído por um fake que captura a tarefa enfileirada — o
+// resto do fluxo (registro, banco de tokens, redefinição, login) continua 100%
+// real, batendo na API/DB de verdade.
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { DomainExceptionFilter } from '../src/shared/exceptions/domain-exception.filter';
+import { EmailQueuePort } from '../src/emails/domain/email-queue.port';
+import { TarefaEmail } from '../src/emails/domain/tarefa-email';
+
+class FakeEmailQueue extends EmailQueuePort {
+  tarefas: TarefaEmail[] = [];
+
+  async enfileirar(tarefa: TarefaEmail): Promise<void> {
+    this.tarefas.push(tarefa);
+  }
+
+  tokenRecuperacaoPara(destinatario: string): string | undefined {
+    const tarefa = this.tarefas.find(
+      (t): t is Extract<TarefaEmail, { tipo: 'RECUPERACAO_SENHA' }> =>
+        t.tipo === 'RECUPERACAO_SENHA' && t.destinatario === destinatario,
+    );
+    return tarefa?.token;
+  }
+}
 
 describe('Recuperação de senha de Cliente (e2e)', () => {
   let app: INestApplication;
+  let fakeEmailQueue: FakeEmailQueue;
 
   beforeAll(async () => {
+    fakeEmailQueue = new FakeEmailQueue();
+
     const moduleRef: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
-    }).compile();
+    })
+      .overrideProvider(EmailQueuePort)
+      .useValue(fakeEmailQueue)
+      .compile();
 
     app = moduleRef.createNestApplication();
     app.useGlobalPipes(
@@ -36,7 +67,7 @@ describe('Recuperação de senha de Cliente (e2e)', () => {
   }
 
   // 2 chamadas a /login neste teste.
-  it('solicita, redefine com o token, loga com a senha nova, e o mesmo token não pode ser reusado', async () => {
+  it('solicita, redefine com o token enfileirado pro e-mail, loga com a senha nova, e o mesmo token não pode ser reusado', async () => {
     const email = emailUnico();
     await request(app.getHttpServer())
       .post('/auth/clientes/registrar')
@@ -47,7 +78,11 @@ describe('Recuperação de senha de Cliente (e2e)', () => {
       .post('/auth/clientes/esqueci-senha')
       .send({ email })
       .expect(200);
-    const token = solicitacao.body.token;
+    expect(solicitacao.body).toEqual({
+      mensagem: 'Se o e-mail estiver cadastrado, enviaremos instruções de recuperação.',
+    });
+
+    const token = fakeEmailQueue.tokenRecuperacaoPara(email);
     expect(token).toBeTruthy();
 
     await request(app.getHttpServer())
@@ -84,27 +119,31 @@ describe('Recuperação de senha de Cliente (e2e)', () => {
     expect(resposta.body.erro).toBe('TOKEN_RECUPERACAO_INVALIDO');
   });
 
-  it('e-mail não cadastrado ainda responde 200 sem token — não revela se a conta existe', async () => {
-    const resposta = await request(app.getHttpServer())
+  it('e-mail não cadastrado ainda responde 200 e não enfileira nenhum e-mail — não revela se a conta existe', async () => {
+    const antes = fakeEmailQueue.tarefas.length;
+
+    await request(app.getHttpServer())
       .post('/auth/clientes/esqueci-senha')
       .send({ email: 'ninguem-tem-essa-conta@teste.com' })
       .expect(200);
 
-    expect(resposta.body.token).toBeUndefined();
+    expect(fakeEmailQueue.tarefas.length).toBe(antes);
   });
 
-  it('cliente sem senha (só existe do checkout de convidado) também não recebe token', async () => {
+  it('cliente sem senha (só existe do checkout de convidado) também não gera token nem enfileira e-mail', async () => {
     const email = emailUnico();
     await request(app.getHttpServer())
       .post('/clientes')
       .send({ nome: 'Cliente convidado', email })
       .expect(201);
 
-    const resposta = await request(app.getHttpServer())
+    const antes = fakeEmailQueue.tarefas.length;
+
+    await request(app.getHttpServer())
       .post('/auth/clientes/esqueci-senha')
       .send({ email })
       .expect(200);
 
-    expect(resposta.body.token).toBeUndefined();
+    expect(fakeEmailQueue.tarefas.length).toBe(antes);
   });
 });

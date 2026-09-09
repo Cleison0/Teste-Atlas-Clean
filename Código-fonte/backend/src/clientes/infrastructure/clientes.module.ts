@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { AuthModule } from '../../auth/infrastructure/auth.module';
+import { EmailsModule } from '../../emails/infrastructure/emails.module';
 import { ClientesController } from '../presentation/clientes.controller';
 import { EnderecosController } from '../presentation/enderecos.controller';
 import { ClientesAuthController } from '../presentation/clientes-auth.controller';
@@ -30,7 +31,7 @@ import { RedefinirSenhaUseCase } from '../application/auth/redefinir-senha.use-c
 import { TrocarSenhaUseCase } from '../application/auth/trocar-senha.use-case';
 
 @Module({
-  imports: [AuthModule],
+  imports: [AuthModule, EmailsModule],
   controllers: [ClientesController, EnderecosController, ClientesAuthController],
   providers: [
     { provide: ClienteRepository, useClass: PrismaClienteRepository },

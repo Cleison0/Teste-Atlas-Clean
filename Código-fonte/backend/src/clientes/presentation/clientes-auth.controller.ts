@@ -51,21 +51,16 @@ export class ClientesAuthController {
 
   // Sempre 200 independente do e-mail existir ou não — não confirma nem nega
   // cadastro (ver SolicitarRecuperacaoSenhaUseCase). Throttled pelo mesmo motivo
-  // do login: alvo de enumeração/abuso.
-  //
-  // `token` só vem preenchido no corpo da resposta enquanto não existir envio de
-  // e-mail de verdade (ver TODO em SolicitarRecuperacaoSenhaUseCase) — é assim que
-  // o cliente descobre o token pra chamar POST /redefinir-senha hoje. Quando um
-  // provedor de e-mail for configurado, isso deve parar de ir na resposta HTTP
-  // (só no e-mail) — undefined vira o valor sempre devolvido.
+  // do login: alvo de enumeração/abuso. O token vai só por e-mail agora — nunca
+  // no corpo da resposta HTTP (antes ia aqui como workaround enquanto não havia
+  // provedor de e-mail configurado).
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @HttpCode(200)
   @Post('esqueci-senha')
-  async esqueciSenha(@Body() dto: EsqueciSenhaDto): Promise<{ mensagem: string; token?: string }> {
-    const token = await this.solicitarRecuperacaoSenhaUseCase.executar(dto.email);
+  async esqueciSenha(@Body() dto: EsqueciSenhaDto): Promise<{ mensagem: string }> {
+    await this.solicitarRecuperacaoSenhaUseCase.executar(dto.email);
     return {
       mensagem: 'Se o e-mail estiver cadastrado, enviaremos instruções de recuperação.',
-      token: token ?? undefined,
     };
   }
 
