@@ -10,6 +10,7 @@ import {
 } from '../../pedidos/domain/pedido-state-machine';
 import { StatusPedido } from '../../pedidos/domain/status-pedido.enum';
 import { PedidoEmStatusInvalidoException } from '../../pedidos/domain/pedidos.exceptions';
+import { EmailQueuePort } from '../../emails/domain/email-queue.port';
 import { TransactionManager } from '../../shared/prisma/transaction-manager';
 import { Pagamento } from '../domain/pagamento.entity';
 import { StatusPagamento } from '../domain/status-pagamento.enum';
@@ -40,6 +41,7 @@ export class ReconciliarPedidoService {
     private readonly produtoRepository: ProdutoRepository,
     private readonly cupomRepository: CupomRepository,
     private readonly transactionManager: TransactionManager,
+    private readonly emailQueue: EmailQueuePort,
   ) {}
 
   async executar(pagamento: Pagamento): Promise<void> {
@@ -134,6 +136,10 @@ export class ReconciliarPedidoService {
         }
         await this.pedidoRepository.atualizarStatus(pedido.id, StatusPedido.PAGO, contexto);
       });
+      // Só dispara depois da transação commitar de verdade — nunca de dentro dela (ver
+      // EmailQueuePort: enfileirar nunca lança, então isso não pode reabrir o try/catch
+      // do decremento de estoque acima).
+      await this.emailQueue.enfileirar({ tipo: 'PAGAMENTO_APROVADO', pedidoId: pedido.id });
     } catch (erro) {
       if (erro instanceof EstoqueInsuficienteException) {
         this.logger.error(

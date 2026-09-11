@@ -8,6 +8,11 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: path.join(__dirname),
   },
+  images: {
+    // Fotos de produto são hospedadas no Cloudinary (ver CloudinaryStorageAdapter
+    // no backend) — next/image bloqueia qualquer domínio remoto não liberado aqui.
+    remotePatterns: [{ protocol: 'https', hostname: 'res.cloudinary.com' }],
+  },
 };
 
 export default nextConfig;

@@ -5,6 +5,7 @@ import { CalcularFreteUseCase } from '../../frete/application/calcular-frete.use
 import { ShippingAllocator } from '../../frete/domain/shipping-allocator';
 import { ClienteRepository } from '../../clientes/domain/cliente.repository';
 import { ClienteNaoEncontradoException } from '../../clientes/domain/clientes.exceptions';
+import { EmailQueuePort } from '../../emails/domain/email-queue.port';
 import { PedidoRepository } from '../domain/pedido.repository';
 import {
   ContatoPedido,
@@ -37,6 +38,7 @@ export class CriarPedidoUseCase {
     private readonly calcularFreteUseCase: CalcularFreteUseCase,
     private readonly pedidoRepository: PedidoRepository,
     private readonly clienteRepository: ClienteRepository,
+    private readonly emailQueue: EmailQueuePort,
   ) {}
 
   async executar(
@@ -118,7 +120,7 @@ export class CriarPedidoUseCase {
     const statusInicial = canal === 'whatsapp' ? StatusPedido.AGUARDANDO_CONTATO : undefined;
     const total = Number((carrinho.total - carrinho.desconto + valorFrete).toFixed(2));
 
-    return this.pedidoRepository.criar(
+    const pedido = await this.pedidoRepository.criar(
       itens,
       total,
       entrega,
@@ -129,5 +131,11 @@ export class CriarPedidoUseCase {
       carrinho.desconto,
       carrinho.cupomCodigo,
     );
+
+    // Best-effort: enfileirar nunca lança (ver EmailQueuePort) — um Redis fora do ar
+    // não pode impedir a criação do pedido.
+    await this.emailQueue.enfileirar({ tipo: 'CONFIRMACAO_PEDIDO', pedidoId: pedido.id });
+
+    return pedido;
   }
 }

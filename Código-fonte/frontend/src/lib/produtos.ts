@@ -12,6 +12,10 @@ export interface MarcaDoProduto {
 export interface ProdutoTipoDoProduto {
   slug: string;
   nome: string;
+  /** Texto técnico/precauções padrão do tipo. Nem todo tipo tem esse conteúdo
+   * cadastrado ainda — undefined quando não há. */
+  infoTecnica?: string;
+  precaucoes?: string;
 }
 
 export interface Produto {
@@ -36,6 +40,10 @@ export interface ProdutoPaginado {
   pagina: number;
   limite: number;
   totalPaginas: number;
+  /** Menor/maior preço no recorte atual (ignorando precoMin/precoMax) — limites
+   * reais pro slider de preço. undefined se não há nenhum produto no recorte. */
+  precoMinCatalogo?: number;
+  precoMaxCatalogo?: number;
 }
 
 export interface ImagemProduto {
@@ -47,18 +55,38 @@ export interface ImagemProduto {
   principal: boolean;
 }
 
+export interface FiltrosListarProdutos {
+  pagina: number;
+  limite: number;
+  busca?: string;
+  categoria?: string;
+  /** Variantes (marca/embalagem) do mesmo tipo genérico — usado pela página de
+   * detalhe de produto pra buscar só as ~poucas variantes, não o catálogo inteiro. */
+  produtoTipoSlug?: string;
+  /** Várias categorias, combinadas com OR entre si — independente de `categoria`. */
+  categorias?: string[];
+  /** Várias marcas, combinadas com OR entre si. */
+  marcaIds?: string[];
+  precoMin?: number;
+  precoMax?: number;
+  /** true = só estoque > 0. */
+  disponivel?: boolean;
+  emPromocao?: boolean;
+  ordenarPor?: 'nome' | 'preco' | 'createdAt';
+  direcao?: 'asc' | 'desc';
+}
+
+export interface OpcoesListarProdutos {
+  /** Só faz sentido em chamada server-side (RSC) — ignorado pelo fetch do browser. */
+  next?: { revalidate?: number };
+  /** Cancela a requisição em voo — React Query injeta isso automaticamente via queryFn. */
+  signal?: AbortSignal;
+}
+
 // Loja pública: sempre ativo=true, diferente do admin (que precisa ver inativos também).
 export function listarProdutos(
-  params: {
-    pagina: number;
-    limite: number;
-    busca?: string;
-    categoria?: string;
-    emPromocao?: boolean;
-    ordenarPor?: 'nome' | 'preco' | 'createdAt';
-    direcao?: 'asc' | 'desc';
-  },
-  opcoes?: { next?: { revalidate?: number } },
+  params: FiltrosListarProdutos,
+  opcoes?: OpcoesListarProdutos,
 ): Promise<ProdutoPaginado> {
   const query = new URLSearchParams({
     pagina: String(params.pagina),
@@ -67,6 +95,12 @@ export function listarProdutos(
   });
   if (params.busca) query.set('busca', params.busca);
   if (params.categoria) query.set('categoria', params.categoria);
+  if (params.produtoTipoSlug) query.set('produtoTipoSlug', params.produtoTipoSlug);
+  for (const categoria of params.categorias ?? []) query.append('categorias', categoria);
+  for (const marcaId of params.marcaIds ?? []) query.append('marcaIds', marcaId);
+  if (params.precoMin !== undefined) query.set('precoMin', String(params.precoMin));
+  if (params.precoMax !== undefined) query.set('precoMax', String(params.precoMax));
+  if (params.disponivel) query.set('disponivel', 'true');
   if (params.emPromocao) query.set('emPromocao', 'true');
   if (params.ordenarPor) query.set('ordenarPor', params.ordenarPor);
   if (params.direcao) query.set('direcao', params.direcao);
@@ -81,6 +115,9 @@ export function listarProdutosMaisVendidos(
   return api.get<Produto[]>(`/produtos/mais-vendidos?limite=${limite}`, opcoes);
 }
 
-export function listarImagensProduto(produtoId: string): Promise<ImagemProduto[]> {
-  return api.get<ImagemProduto[]>(`/produtos/${produtoId}/imagens`);
+export function listarImagensProduto(
+  produtoId: string,
+  opcoes?: { signal?: AbortSignal },
+): Promise<ImagemProduto[]> {
+  return api.get<ImagemProduto[]>(`/produtos/${produtoId}/imagens`, opcoes);
 }

@@ -6,7 +6,10 @@ export interface Marca {
   imagemUrl?: string;
 }
 
-// GET /marcas é público (a loja usa pro carrossel de marcas da home).
-export function listarMarcas(opcoes?: { next?: { revalidate?: number } }): Promise<Marca[]> {
+// GET /marcas é público (a loja usa pro carrossel de marcas da home e no catálogo).
+export function listarMarcas(opcoes?: {
+  next?: { revalidate?: number };
+  signal?: AbortSignal;
+}): Promise<Marca[]> {
   return api.get<Marca[]>('/marcas', opcoes);
 }

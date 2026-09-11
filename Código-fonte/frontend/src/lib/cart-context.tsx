@@ -1,7 +1,8 @@
 'use client';
 
-import { ReactNode, createContext, useContext, useState } from 'react';
+import { ReactNode, createContext, useContext, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useToast } from '@/components/ui/Toast';
 import {
   adicionarItemCarrinho,
   aplicarCupomCarrinho,
@@ -12,6 +13,7 @@ import {
   removerItemCarrinho,
   type CarrinhoServidor,
 } from '@/lib/carrinho-api';
+import { ApiError } from '@/lib/http';
 
 export type {
   ItemCarrinhoServidor as ItemCarrinho,
@@ -27,6 +29,11 @@ const CARRINHO_VAZIO: CarrinhoServidor = {
   desconto: 0,
   totalComDesconto: 0,
 };
+
+// Quantos ms esperar sem um novo clique antes de mandar a quantidade pro servidor —
+// cliques rápidos no +/- atualizam a UI na hora (via setQueryData otimista) mas só
+// geram UMA requisição, com o valor final, em vez de uma por clique.
+const DEBOUNCE_QUANTIDADE_MS = 500;
 
 interface CartContextValue {
   itens: CarrinhoServidor['itens'];
@@ -45,8 +52,13 @@ interface CartContextValue {
   hidratado: boolean;
   quantidadeTotal: number;
   adicionar: (produtoId: string, quantidade?: number) => Promise<void>;
-  remover: (produtoId: string) => Promise<void>;
-  atualizarQuantidade: (produtoId: string, quantidade: number) => Promise<void>;
+  /** Otimista + debounced (mesmo caminho de `atualizarQuantidade`, com quantidade 0) —
+   * não espera a requisição real terminar, por isso não devolve Promise. */
+  remover: (produtoId: string) => void;
+  /** Otimista + debounced: a UI reflete a nova quantidade na hora; a requisição de
+   * verdade só sai DEBOUNCE_QUANTIDADE_MS depois do último clique pro mesmo produto.
+   * Reverte sozinho (com toast) se a requisição eventualmente falhar. */
+  atualizarQuantidade: (produtoId: string, quantidade: number) => void;
   limpar: () => Promise<void>;
   /** Lança a mensagem de erro do backend (ex: cupom inválido/expirado) — quem chama
    * decide como mostrar. */
@@ -69,9 +81,40 @@ export function useCart(): CartContextValue {
   return ctx;
 }
 
+/** Projeção local só pra o instante entre o clique e a resposta do servidor — nunca
+ * é o dado que vai pro checkout (isso sempre vem fresco da API). Desconto/cupom não
+ * são recalculados aqui (dependeria da regra do cupom, que só o backend conhece) —
+ * ficam com o valor anterior até o refetch corrigir, o que é inofensivo por uma
+ * fração de segundo. */
+function comQuantidadeOtimista(
+  carrinho: CarrinhoServidor,
+  produtoId: string,
+  quantidade: number,
+): CarrinhoServidor {
+  const itens =
+    quantidade <= 0
+      ? carrinho.itens.filter((item) => item.produtoId !== produtoId)
+      : carrinho.itens.map((item) =>
+          item.produtoId === produtoId
+            ? { ...item, quantidade, subtotal: item.precoUnitario * quantidade }
+            : item,
+        );
+  const total = Number(itens.reduce((soma, item) => soma + item.subtotal, 0).toFixed(2));
+  return {
+    ...carrinho,
+    itens,
+    total,
+    totalComDesconto: Number((total - carrinho.desconto).toFixed(2)),
+  };
+}
+
 export function CartProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
+  const { showToast } = useToast();
   const [drawerAberto, setDrawerAberto] = useState(false);
+  // Um timer de debounce por produto — mexer na quantidade de um item não deve
+  // adiar/cancelar o debounce de outro item mexido em seguida.
+  const timersRef = useRef(new Map<string, ReturnType<typeof setTimeout>>());
 
   // Mesma queryKey usada por qualquer outro componente que precise da instância de
   // carrinho crua (ex.: checkout, pra chamar .refetch() antes de criar o pedido) —
@@ -87,15 +130,17 @@ export function CartProvider({ children }: { children: ReactNode }) {
       adicionarItemCarrinho(produtoId, quantidade),
     onSuccess: aposMutar,
   });
+
+  // Sem onSuccess/invalidate aqui de propósito — quem dispara essa mutation
+  // (atualizarQuantidade abaixo) já cuida do otimismo e da reconciliação via
+  // onSettled, pra não brigar com o debounce.
   const atualizarQuantidadeMutation = useMutation({
     mutationFn: ({ produtoId, quantidade }: { produtoId: string; quantidade: number }) =>
-      atualizarQuantidadeItemCarrinho(produtoId, quantidade),
-    onSuccess: aposMutar,
+      quantidade <= 0
+        ? removerItemCarrinho(produtoId)
+        : atualizarQuantidadeItemCarrinho(produtoId, quantidade),
   });
-  const removerMutation = useMutation({
-    mutationFn: (produtoId: string) => removerItemCarrinho(produtoId),
-    onSuccess: aposMutar,
-  });
+
   const limparMutation = useMutation({
     mutationFn: () => limparCarrinhoServidor(),
     onSuccess: aposMutar,
@@ -117,12 +162,43 @@ export function CartProvider({ children }: { children: ReactNode }) {
     await adicionarMutation.mutateAsync({ produtoId, quantidade });
   }
 
-  async function remover(produtoId: string) {
-    await removerMutation.mutateAsync(produtoId);
+  function remover(produtoId: string) {
+    // Reaproveita o mesmo caminho otimista/debounced com quantidade 0 — remoção é
+    // só um caso particular de "mudar quantidade", inclusive pro rollback.
+    atualizarQuantidade(produtoId, 0);
   }
 
-  async function atualizarQuantidade(produtoId: string, quantidade: number) {
-    await atualizarQuantidadeMutation.mutateAsync({ produtoId, quantidade });
+  function atualizarQuantidade(produtoId: string, quantidade: number) {
+    const anterior = queryClient.getQueryData<CarrinhoServidor>(CHAVE_QUERY_CARRINHO);
+    if (!anterior) return; // ainda não hidratou — não há o que otimizar em cima
+
+    // Atualiza a UI na hora, a cada clique — isso NÃO espera o debounce.
+    queryClient.setQueryData<CarrinhoServidor>(CHAVE_QUERY_CARRINHO, (atual) =>
+      atual ? comQuantidadeOtimista(atual, produtoId, quantidade) : atual,
+    );
+
+    const timerAnterior = timersRef.current.get(produtoId);
+    if (timerAnterior) clearTimeout(timerAnterior);
+
+    const timer = setTimeout(async () => {
+      timersRef.current.delete(produtoId);
+      try {
+        const resultado = await atualizarQuantidadeMutation.mutateAsync({ produtoId, quantidade });
+        queryClient.setQueryData(CHAVE_QUERY_CARRINHO, resultado);
+      } catch (erro) {
+        // Reverte pro que o servidor realmente tem (não pro estado otimista, que já
+        // provou estar errado) — busca de novo em vez de usar `anterior`, que pode
+        // estar desatualizado se outra mudança aconteceu nesse meio-tempo.
+        await queryClient.invalidateQueries({ queryKey: CHAVE_QUERY_CARRINHO });
+        showToast(
+          erro instanceof ApiError
+            ? erro.message
+            : 'Não foi possível atualizar o carrinho agora. Tente de novo.',
+          'error',
+        );
+      }
+    }, DEBOUNCE_QUANTIDADE_MS);
+    timersRef.current.set(produtoId, timer);
   }
 
   async function limpar() {

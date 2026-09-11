@@ -3,15 +3,18 @@
 import { FormEvent, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 import { ApiError } from '@/lib/http';
 import { loginCliente, registrarCliente } from '@/lib/conta';
 import { salvarSessaoCliente } from '@/lib/conta-auth';
+import { CHAVE_QUERY_CARRINHO } from '@/lib/cart-context';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Card } from '@/components/ui/Card';
 
 export default function CriarContaPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [nome, setNome] = useState('');
   const [email, setEmail] = useState('');
   const [telefone, setTelefone] = useState('');
@@ -31,6 +34,10 @@ export default function CriarContaPage() {
       await registrarCliente({ nome, email, senha, telefone: telefone || undefined });
       const sessao = await loginCliente(email, senha);
       salvarSessaoCliente(sessao);
+      // Mesmo motivo do login (ver conta/entrar/page.tsx): sem isso o header
+      // continuaria mostrando o carrinho anônimo antigo até outra ação disparar
+      // um refetch por conta própria.
+      await queryClient.invalidateQueries({ queryKey: CHAVE_QUERY_CARRINHO });
       router.push('/conta');
     } catch (e) {
       setErro(

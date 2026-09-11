@@ -17,6 +17,21 @@ jobs:
       # Só pra satisfazer a validação de env (JWT_SECRET min. 16 chars) — nunca usado
       # pra assinar nada de verdade, o CI não expõe rotas autenticadas pra ninguém.
       JWT_SECRET: ci-test-secret-not-for-production-use
+    services:
+      # Fila de e-mails (BullMQ) precisa de Redis. O app não trava sem ele (conexão
+      # falha rápido, ver BullmqEmailQueueAdapter), mas o worker força retry
+      # infinito na própria conexão de bloqueio (exigência do BullMQ, não
+      # configurável) — em CI isso estourou o timeout de 30s de um hook do Jest.
+      # Serviço real aqui em vez de mock, mesmo padrão do Postgres embarcado abaixo.
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v5
 

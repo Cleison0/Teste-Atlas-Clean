@@ -12,6 +12,7 @@ import {
 } from '../domain/pedidos.exceptions';
 import { ProdutoRepository } from '../../produtos/domain/produto.repository';
 import { CupomRepository } from '../../cupons/domain/cupom.repository';
+import { EmailQueuePort } from '../../emails/domain/email-queue.port';
 import { TransactionManager } from '../../shared/prisma/transaction-manager';
 
 describe('AtualizarStatusPedidoUseCase', () => {
@@ -19,6 +20,7 @@ describe('AtualizarStatusPedidoUseCase', () => {
   let produtoRepository: jest.Mocked<ProdutoRepository>;
   let cupomRepository: jest.Mocked<CupomRepository>;
   let transactionManager: jest.Mocked<TransactionManager>;
+  let emailQueue: jest.Mocked<EmailQueuePort>;
   let useCase: AtualizarStatusPedidoUseCase;
 
   const contextoFalso = { transacao: 'fake' };
@@ -64,11 +66,14 @@ describe('AtualizarStatusPedidoUseCase', () => {
       executar: jest.fn((fn: (contexto: unknown) => Promise<unknown>) => fn(contextoFalso)),
     } as unknown as jest.Mocked<TransactionManager>;
 
+    emailQueue = { enfileirar: jest.fn() } as unknown as jest.Mocked<EmailQueuePort>;
+
     useCase = new AtualizarStatusPedidoUseCase(
       pedidoRepository,
       produtoRepository,
       cupomRepository,
       transactionManager,
+      emailQueue,
     );
   });
 
@@ -107,6 +112,10 @@ describe('AtualizarStatusPedidoUseCase', () => {
       StatusPedido.PAGO,
       contextoFalso,
     );
+    expect(emailQueue.enfileirar).toHaveBeenCalledWith({
+      tipo: 'PAGAMENTO_APROVADO',
+      pedidoId: 'pedido-1',
+    });
   });
 
   it('PAGO → ESTORNADO: devolve estoque e muda status na mesma transação', async () => {
@@ -150,6 +159,10 @@ describe('AtualizarStatusPedidoUseCase', () => {
     pedidoRepository.buscarPorId.mockResolvedValue(criarPedido(StatusPedido.SEPARACAO));
     await useCase.executar('pedido-1', StatusPedido.ENVIADO);
     expect(pedidoRepository.atualizarStatus).toHaveBeenCalledWith('pedido-1', StatusPedido.ENVIADO);
+    expect(emailQueue.enfileirar).toHaveBeenCalledWith({
+      tipo: 'PEDIDO_ENVIADO',
+      pedidoId: 'pedido-1',
+    });
 
     pedidoRepository.buscarPorId.mockResolvedValue(criarPedido(StatusPedido.ENVIADO));
     await useCase.executar('pedido-1', StatusPedido.ENTREGUE);

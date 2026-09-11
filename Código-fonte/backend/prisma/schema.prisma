@@ -408,11 +408,12 @@ model Pedido {
   contatoEmail    String? @map("contato_email")
   contatoTelefone String? @map("contato_telefone")
 
-  cliente    Cliente?                @relation(fields: [clienteId], references: [id])
-  cupom      Cupom?                  @relation(fields: [cupomCodigo], references: [codigo])
-  itens      ItemPedido[]
-  pagamentos Pagamento[]
-  historico  PedidoStatusHistorico[]
+  cliente        Cliente?                @relation(fields: [clienteId], references: [id])
+  cupom          Cupom?                  @relation(fields: [cupomCodigo], references: [codigo])
+  itens          ItemPedido[]
+  pagamentos     Pagamento[]
+  historico      PedidoStatusHistorico[]
+  emailsEnviados EmailEnviado[]
 
   @@index([clienteId])
   @@map("pedidos")
@@ -492,4 +493,28 @@ model Resenha {
   createdAt  DateTime @default(now()) @map("created_at")
 
   @@map("resenhas")
+}
+
+enum TipoEmail {
+  CONFIRMACAO_PEDIDO
+  PAGAMENTO_APROVADO
+  PEDIDO_ENVIADO
+}
+
+// Guarda de idempotência: um e-mail de pedido (confirmação/pagamento/envio) só pode
+// ser registrado uma vez por (tipo, pedido) — a constraint única é o que impede reenvio
+// se o gatilho disparar mais de uma vez (ex.: webhook reentregue). Recuperação de senha
+// NÃO passa por aqui de propósito: cada solicitação gera um token novo e precisa de um
+// e-mail novo — dedup por igual quebraria o fluxo legítimo de pedir de novo.
+model EmailEnviado {
+  id           String    @id @default(uuid())
+  tipo         TipoEmail
+  pedidoId     String    @map("pedido_id")
+  destinatario String
+  enviadoEm    DateTime  @default(now()) @map("enviado_em")
+
+  pedido Pedido @relation(fields: [pedidoId], references: [id])
+
+  @@unique([tipo, pedidoId])
+  @@map("emails_enviados")
 }

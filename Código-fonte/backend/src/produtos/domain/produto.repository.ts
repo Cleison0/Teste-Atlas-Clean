@@ -5,6 +5,16 @@ export interface FiltrosListagemProdutos {
   limite: number;
   busca?: string;
   categoria?: string;
+  marcaId?: string;
+  produtoTipoSlug?: string;
+  /** OR entre si — independente de `categoria` (singular). */
+  categorias?: string[];
+  /** OR entre si — independente de `marcaId` (singular). */
+  marcaIds?: string[];
+  precoMin?: number;
+  precoMax?: number;
+  /** true = só produtos com estoque > 0. */
+  disponivel?: boolean;
   ativo?: boolean;
   /** true = só produtos com preço promocional cadastrado (ver Produto.estaEmPromocao). */
   emPromocao?: boolean;
@@ -17,6 +27,13 @@ export interface ResultadoPaginado<T> {
   total: number;
   pagina: number;
   limite: number;
+  /**
+   * Menor/maior preço entre os produtos que batem com os filtros ATUAIS exceto
+   * precoMin/precoMax (senão o próprio filtro de preço estreitaria os limites do
+   * slider a cada uso). undefined quando não há nenhum produto no escopo.
+   */
+  precoMinCatalogo?: number;
+  precoMaxCatalogo?: number;
 }
 
 export interface DadosCriacaoProduto {

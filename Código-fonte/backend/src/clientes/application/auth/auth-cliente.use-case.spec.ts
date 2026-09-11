@@ -16,6 +16,7 @@ import { RenovarTokenUseCase } from './renovar-token.use-case';
 import { RedefinirSenhaUseCase } from './redefinir-senha.use-case';
 import { TrocarSenhaUseCase } from './trocar-senha.use-case';
 import { SolicitarRecuperacaoSenhaUseCase } from './solicitar-recuperacao-senha.use-case';
+import { EmailQueuePort } from '../../../emails/domain/email-queue.port';
 import { hashToken } from '../../../shared/token.util';
 
 const SENHA_CLARA = 'senha-forte-123';
@@ -47,6 +48,10 @@ function criarClienteRepositoryMock(): jest.Mocked<ClienteRepository> {
     listarTodos: jest.fn(),
     atualizarSenha: jest.fn(),
   } as unknown as jest.Mocked<ClienteRepository>;
+}
+
+function criarEmailQueueMock(): jest.Mocked<EmailQueuePort> {
+  return { enfileirar: jest.fn() } as unknown as jest.Mocked<EmailQueuePort>;
 }
 
 function criarRefreshTokenRepositoryMock(): jest.Mocked<RefreshTokenRepository> {
@@ -337,42 +342,59 @@ describe('TrocarSenhaUseCase', () => {
 });
 
 describe('SolicitarRecuperacaoSenhaUseCase', () => {
-  it('gera e devolve um token quando o cliente existe e tem senha', async () => {
+  it('gera o token, persiste o hash e enfileira o e-mail quando o cliente existe e tem senha', async () => {
     const clienteRepository = criarClienteRepositoryMock();
     const tokenRepository = criarTokenRecuperacaoRepositoryMock();
+    const emailQueue = criarEmailQueueMock();
     clienteRepository.buscarPorEmail.mockResolvedValue(criarClienteMock());
 
-    const useCase = new SolicitarRecuperacaoSenhaUseCase(clienteRepository, tokenRepository);
-    const token = await useCase.executar('maria@teste.com');
+    const useCase = new SolicitarRecuperacaoSenhaUseCase(
+      clienteRepository,
+      tokenRepository,
+      emailQueue,
+    );
+    await useCase.executar('maria@teste.com');
 
-    expect(token).toBeTruthy();
     expect(tokenRepository.invalidarValidosDoCliente).toHaveBeenCalledWith('cli-1');
     expect(tokenRepository.criar).toHaveBeenCalledWith(
       expect.objectContaining({ clienteId: 'cli-1' }),
     );
+    expect(emailQueue.enfileirar).toHaveBeenCalledWith(
+      expect.objectContaining({ tipo: 'RECUPERACAO_SENHA', destinatario: 'maria@teste.com' }),
+    );
   });
 
-  it('não gera token pra e-mail inexistente (não revela se existe)', async () => {
+  it('não gera token nem enfileira e-mail pra e-mail inexistente (não revela se existe)', async () => {
     const clienteRepository = criarClienteRepositoryMock();
     const tokenRepository = criarTokenRecuperacaoRepositoryMock();
+    const emailQueue = criarEmailQueueMock();
     clienteRepository.buscarPorEmail.mockResolvedValue(null);
 
-    const useCase = new SolicitarRecuperacaoSenhaUseCase(clienteRepository, tokenRepository);
-    const token = await useCase.executar('ninguem@teste.com');
+    const useCase = new SolicitarRecuperacaoSenhaUseCase(
+      clienteRepository,
+      tokenRepository,
+      emailQueue,
+    );
+    await useCase.executar('ninguem@teste.com');
 
-    expect(token).toBeNull();
     expect(tokenRepository.criar).not.toHaveBeenCalled();
+    expect(emailQueue.enfileirar).not.toHaveBeenCalled();
   });
 
-  it('não gera token pra cliente sem senha (só existe do checkout de convidado)', async () => {
+  it('não gera token nem enfileira e-mail pra cliente sem senha (só existe do checkout de convidado)', async () => {
     const clienteRepository = criarClienteRepositoryMock();
     const tokenRepository = criarTokenRecuperacaoRepositoryMock();
+    const emailQueue = criarEmailQueueMock();
     clienteRepository.buscarPorEmail.mockResolvedValue(criarClienteMock(false));
 
-    const useCase = new SolicitarRecuperacaoSenhaUseCase(clienteRepository, tokenRepository);
-    const token = await useCase.executar('maria@teste.com');
+    const useCase = new SolicitarRecuperacaoSenhaUseCase(
+      clienteRepository,
+      tokenRepository,
+      emailQueue,
+    );
+    await useCase.executar('maria@teste.com');
 
-    expect(token).toBeNull();
     expect(tokenRepository.criar).not.toHaveBeenCalled();
+    expect(emailQueue.enfileirar).not.toHaveBeenCalled();
   });
 });

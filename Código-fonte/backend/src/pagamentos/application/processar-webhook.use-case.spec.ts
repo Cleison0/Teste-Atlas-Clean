@@ -6,6 +6,7 @@ import { PaymentGateway } from '../domain/payment-gateway.port';
 import { PedidoRepository } from '../../pedidos/domain/pedido.repository';
 import { ProdutoRepository } from '../../produtos/domain/produto.repository';
 import { CupomRepository } from '../../cupons/domain/cupom.repository';
+import { EmailQueuePort } from '../../emails/domain/email-queue.port';
 import { TransactionManager } from '../../shared/prisma/transaction-manager';
 import { Pagamento } from '../domain/pagamento.entity';
 import { MetodoPagamento } from '../domain/metodo-pagamento.enum';
@@ -94,11 +95,14 @@ describe('ProcessarWebhookUseCase (idempotência)', () => {
       executar: jest.fn((fn: (contexto: unknown) => Promise<unknown>) => fn(contextoFalso)),
     } as unknown as jest.Mocked<TransactionManager>;
 
+    const emailQueue = { enfileirar: jest.fn() } as unknown as jest.Mocked<EmailQueuePort>;
+
     const reconciliarPedidoService = new ReconciliarPedidoService(
       pedidoRepository,
       produtoRepository,
       cupomRepository,
       transactionManager,
+      emailQueue,
     );
 
     useCase = new ProcessarWebhookUseCase(

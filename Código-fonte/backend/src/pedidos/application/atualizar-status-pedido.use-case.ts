@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ProdutoRepository } from '../../produtos/domain/produto.repository';
 import { CupomRepository } from '../../cupons/domain/cupom.repository';
+import { EmailQueuePort } from '../../emails/domain/email-queue.port';
 import { TransactionManager } from '../../shared/prisma/transaction-manager';
 import { Pedido } from '../domain/pedido.entity';
 import { PedidoRepository } from '../domain/pedido.repository';
@@ -25,6 +26,7 @@ export class AtualizarStatusPedidoUseCase {
     private readonly produtoRepository: ProdutoRepository,
     private readonly cupomRepository: CupomRepository,
     private readonly transactionManager: TransactionManager,
+    private readonly emailQueue: EmailQueuePort,
   ) {}
 
   async executar(id: string, novoStatus: StatusPedido): Promise<Pedido> {
@@ -41,7 +43,7 @@ export class AtualizarStatusPedidoUseCase {
       // controller (409) e o pedido continua como estava — não fica "meio confirmado".
       // Uso do cupom (se houver) só conta agora, pelo mesmo motivo do estoque: aplicar
       // na criação do pedido não "gasta" nada de verdade.
-      return this.transactionManager.executar(async (contexto) => {
+      const atualizado = await this.transactionManager.executar(async (contexto) => {
         await this.produtoRepository.decrementarEstoque(
           pedido.itens.map((item) => ({
             produtoId: item.produtoId,
@@ -55,13 +57,21 @@ export class AtualizarStatusPedidoUseCase {
         }
         return this.pedidoRepository.atualizarStatus(id, novoStatus, contexto);
       });
+      // Fora da transação, igual ReconciliarPedidoService — a dedup em EmailEnviadoRepository
+      // cobre o caso de o pedido também ter sido confirmado pelo fluxo de pagamento online.
+      await this.emailQueue.enfileirar({ tipo: 'PAGAMENTO_APROVADO', pedidoId: atualizado.id });
+      return atualizado;
     }
 
     const precisaDevolverEstoque =
       pedido.status === StatusPedido.PAGO && STATUS_DEVOLVEM_ESTOQUE_DE_PAGO.has(novoStatus);
 
     if (!precisaDevolverEstoque) {
-      return this.pedidoRepository.atualizarStatus(id, novoStatus);
+      const atualizado = await this.pedidoRepository.atualizarStatus(id, novoStatus);
+      if (novoStatus === StatusPedido.ENVIADO) {
+        await this.emailQueue.enfileirar({ tipo: 'PEDIDO_ENVIADO', pedidoId: atualizado.id });
+      }
+      return atualizado;
     }
 
     return this.transactionManager.executar(async (contexto) => {

@@ -3,15 +3,18 @@
 import { FormEvent, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 import { ApiError } from '@/lib/http';
 import { loginCliente } from '@/lib/conta';
 import { salvarSessaoCliente } from '@/lib/conta-auth';
+import { CHAVE_QUERY_CARRINHO } from '@/lib/cart-context';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Card } from '@/components/ui/Card';
 
 export default function EntrarPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
   const [carregando, setCarregando] = useState(false);
@@ -25,6 +28,12 @@ export default function EntrarPage() {
     try {
       const sessao = await loginCliente(email, senha);
       salvarSessaoCliente(sessao);
+      // O backend funde/adota o carrinho anônimo automaticamente na próxima
+      // requisição que carregar os dois headers juntos (X-Cart-Session +
+      // Authorization — ver ResolverCarrinhoSessaoUseCase) — sem invalidar aqui, o
+      // header continuaria mostrando o carrinho anônimo antigo até alguma outra
+      // ação disparar um refetch por conta própria.
+      await queryClient.invalidateQueries({ queryKey: CHAVE_QUERY_CARRINHO });
       router.push('/conta');
     } catch (e) {
       setErro(e instanceof ApiError ? e.message : 'Não foi possível entrar. Tente novamente.');

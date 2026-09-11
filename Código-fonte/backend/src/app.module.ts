@@ -1,8 +1,9 @@
-﻿import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { Module } from '@nestjs/common';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { BullModule } from '@nestjs/bullmq';
 import { PrismaModule } from './shared/prisma/prisma.module';
 import { envValidationSchema } from './shared/config/env-validation.schema';
 import { ProdutosModule } from './produtos/infrastructure/produtos.module';
@@ -17,6 +18,7 @@ import { FreteModule } from './frete/infrastructure/frete.module';
 import { CuponsModule } from './cupons/infrastructure/cupons.module';
 import { BannersModule } from './banners/infrastructure/banners.module';
 import { ResenhasModule } from './resenhas/infrastructure/resenhas.module';
+import { EmailsModule } from './emails/infrastructure/emails.module';
 import { ObservabilityModule } from './shared/observability/observability.module';
 import { HealthModule } from './health/health.module';
 
@@ -29,6 +31,22 @@ import { HealthModule } from './health/health.module';
     }),
     ThrottlerModule.forRoot([{ name: 'default', ttl: 60_000, limit: 60 }]),
     ScheduleModule.forRoot(),
+    // maxRetriesPerRequest baixo + offline queue desligada: se o Redis estiver fora do
+    // ar (ou não existir, como no ambiente de testes e2e, que não sobe Redis), enfileirar
+    // um e-mail falha rápido em vez de travar a requisição HTTP esperando reconexão —
+    // BullmqEmailQueueAdapter já captura esse erro e só loga (ver EmailQueuePort).
+    BullModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => ({
+        connection: {
+          host: configService.get<string>('REDIS_HOST') || 'localhost',
+          port: configService.get<number>('REDIS_PORT') || 6379,
+          maxRetriesPerRequest: 1,
+          enableOfflineQueue: false,
+          connectTimeout: 2_000,
+        },
+      }),
+    }),
     PrismaModule,
     ObservabilityModule,
     HealthModule,
@@ -44,6 +62,7 @@ import { HealthModule } from './health/health.module';
     CuponsModule,
     BannersModule,
     ResenhasModule,
+    EmailsModule,
   ],
   providers: [
     {
