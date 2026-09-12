@@ -118,9 +118,15 @@ jobs:
       # em localhost pelo próprio Actions) sem precisar descobrir IP de container.
       - name: Sobe o container da imagem buildada e confere GET /health
         run: |
+          # CORS_ORIGIN é obrigatório aqui: a imagem já sobe com NODE_ENV=production
+          # (definido no Dockerfile), e validarCorsOrigin() recusa iniciar sem essa
+          # variável quando NODE_ENV=production — trava de segurança proposital pra
+          # nunca liberar CORS geral em produção por esquecimento, não um bug do
+          # smoke test.
           docker run -d --name atlas-backend-check --network host \
             -e DATABASE_URL="postgresql://atlas:atlas@localhost:5432/atlas_nova_clean" \
             -e JWT_SECRET="ci-docker-check-secret-not-for-real-use" \
+            -e CORS_ORIGIN="http://localhost:3001" \
             -e PORT=3000 \
             atlas-backend:ci-check
 
