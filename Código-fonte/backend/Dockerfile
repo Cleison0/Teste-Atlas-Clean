@@ -19,6 +19,14 @@ RUN npm ci
 # ---- build: gera o client do Prisma e compila o Nest ----
 FROM node:20-bookworm-slim AS build
 WORKDIR /app
+# O binário `openssl` (não só a lib compartilhada) precisa estar presente aqui:
+# `prisma generate` roda `openssl version` pra detectar qual variante do motor de
+# query baixar/usar (schema.prisma não define binaryTargets, então usa "native" —
+# depende de detectar o ambiente certo). bookworm-slim não traz o binário por
+# padrão, só a libssl3 que o próprio Node usa internamente.
+RUN apt-get update -y \
+  && apt-get install -y --no-install-recommends openssl \
+  && rm -rf /var/lib/apt/lists/*
 COPY --from=deps /app/node_modules ./node_modules
 COPY package.json package-lock.json tsconfig.json tsconfig.build.json nest-cli.json ./
 COPY prisma ./prisma
@@ -35,6 +43,13 @@ RUN npm prune --omit=dev
 FROM node:20-bookworm-slim AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
+
+# O motor de query do Prisma (gerado no estágio build, já com a variante certa
+# detectada via `openssl version`) faz link dinâmico contra libssl em tempo de
+# execução — mesmo motivo do apt-get no estágio build, só que aqui é runtime.
+RUN apt-get update -y \
+  && apt-get install -y --no-install-recommends openssl \
+  && rm -rf /var/lib/apt/lists/*
 
 # Imagens oficiais do Node já vêm com um usuário "node" (uid 1000) não-root criado
 # de propósito pra isso — não precisa criar um novo.
