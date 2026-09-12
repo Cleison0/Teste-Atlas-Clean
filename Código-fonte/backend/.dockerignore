@@ -6,3 +6,13 @@ coverage
 .git
 .env
 *.log
+
+# Não usados pelo build de produção (Dockerfile) — só reduzem o contexto enviado
+# ao daemon do Docker. NÃO inclui scripts/: o Dockerfile.dev copia o repo inteiro
+# (`COPY . .`) e o ENTRYPOINT dele roda scripts/docker-entrypoint.dev.sh — excluir
+# a pasta aqui quebraria `docker compose up`.
+test
+docs
+*.md
+.vscode
+.eslintrc.js

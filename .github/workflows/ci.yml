@@ -44,6 +44,9 @@ jobs:
       - name: Instalar dependências
         run: npm ci
 
+      - name: Gerar Prisma Client
+        run: npx prisma generate
+
       - name: Lint
         run: npm run lint
 
@@ -55,6 +58,89 @@ jobs:
 
       - name: Testes e2e (Postgres embarcado)
         run: npm run test:e2e
+
+      - name: Build de produção (mesmo comando usado na imagem Docker)
+        run: npm run build
+
+  docker-build:
+    name: Build da imagem Docker de produção (build + smoke test)
+    runs-on: ubuntu-latest
+    needs: backend
+    defaults:
+      run:
+        working-directory: Código-fonte/backend
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: atlas
+          POSTGRES_PASSWORD: atlas
+          POSTGRES_DB: atlas_nova_clean
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build (sem publicar — só valida que o Dockerfile builda)
+        uses: docker/build-push-action@v6
+        with:
+          context: Código-fonte/backend
+          file: Código-fonte/backend/Dockerfile
+          push: false
+          load: true
+          tags: atlas-backend:ci-check
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: Código-fonte/backend/package-lock.json
+
+      - name: Aplica migrations no Postgres do job (só pra este smoke test)
+        run: |
+          npm ci
+          npx prisma generate
+          npx prisma migrate deploy
+        env:
+          DATABASE_URL: postgresql://atlas:atlas@localhost:5432/atlas_nova_clean
+
+      # --network host: o container roda na mesma pilha de rede do runner, então
+      # "localhost:5432" dentro dele chega no serviço postgres acima (published
+      # em localhost pelo próprio Actions) sem precisar descobrir IP de container.
+      - name: Sobe o container da imagem buildada e confere GET /health
+        run: |
+          docker run -d --name atlas-backend-check --network host \
+            -e DATABASE_URL="postgresql://atlas:atlas@localhost:5432/atlas_nova_clean" \
+            -e JWT_SECRET="ci-docker-check-secret-not-for-real-use" \
+            -e PORT=3000 \
+            atlas-backend:ci-check
+
+          ok=""
+          for i in $(seq 1 20); do
+            if curl -sf http://localhost:3000/health; then
+              ok=1
+              break
+            fi
+            sleep 2
+          done
+
+          echo
+          docker logs atlas-backend-check
+          docker inspect --format='HEALTHCHECK status: {{.State.Health.Status}}' atlas-backend-check || true
+
+          if [ -z "$ok" ]; then
+            echo "GET /health não respondeu 200 a tempo — ver logs acima."
+            exit 1
+          fi
 
   frontend:
     name: Frontend (lint, build)
