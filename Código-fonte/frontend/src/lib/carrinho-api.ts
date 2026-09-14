@@ -10,6 +10,9 @@ export interface ItemCarrinhoServidor {
   subtotal: number;
   disponivel: boolean;
   estoqueDisponivel: number;
+  /** 0 quando nenhuma regra de atacado (desconto automático por quantidade) se
+   * aplica a este item. */
+  descontoAtacado?: number;
 }
 
 export type MotivoIndisponibilidadeCarrinho = 'PRODUTO_INDISPONIVEL' | 'SEM_ESTOQUE';
@@ -26,10 +29,17 @@ export interface CarrinhoServidor {
   itens: ItemCarrinhoServidor[];
   itensIndisponiveis: ItemCarrinhoIndisponivel[];
   total: number;
-  /** 0 quando nenhum cupom válido está aplicado. */
+  /** 0 quando nenhuma regra de atacado se aplica a nenhum item do carrinho. */
+  descontoAtacado?: number;
+  /** 0 quando nenhum cupom válido está aplicado. Só o desconto do cupom por
+   * código — ver descontoAtacado pro desconto automático por quantidade. */
   desconto: number;
   totalComDesconto: number;
   cupomCodigo?: string;
+  /** Preenchido só quando um cupom salvo no carrinho deixou de ser válido nesta
+   * leitura (expirou, esgotou, subtotal caiu abaixo do mínimo etc.) — o cupom já
+   * foi removido, esta é a mensagem pra explicar por quê. */
+  avisoCupom?: string;
 }
 
 // Envia sessionToken (se houver carrinho anônimo local) e Authorization (se houver

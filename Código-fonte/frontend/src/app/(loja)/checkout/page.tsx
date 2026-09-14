@@ -84,6 +84,7 @@ export default function CheckoutPage() {
     itens,
     hidratado,
     limpar,
+    descontoAtacado,
     desconto,
     totalComDesconto,
     cupomCodigo,
@@ -677,6 +678,12 @@ export default function CheckoutPage() {
             )}
           </div>
 
+          {!!descontoAtacado && (
+            <p className="text-right text-[13px] text-green">
+              Desconto por atacado:{' '}
+              <span className="font-mono">-{formatarMoeda(descontoAtacado)}</span>
+            </p>
+          )}
           {!!desconto && (
             <p className="text-right text-[13px] text-green">
               Desconto: <span className="font-mono">-{formatarMoeda(desconto)}</span>
