@@ -58,14 +58,33 @@ export class CarrinhoSessaoResponseDto {
   @ApiProperty({ example: 25.8, description: 'Soma dos itens, sem desconto.' })
   total: number;
 
-  @ApiProperty({ example: 0, description: '0 quando nenhum cupom válido está aplicado.' })
+  @ApiProperty({
+    example: 0,
+    description: 'Soma dos descontos automáticos de atacado (por quantidade) de todos os itens.',
+  })
+  descontoAtacado: number;
+
+  @ApiProperty({
+    example: 0,
+    description: '0 quando nenhum cupom válido está aplicado. Só o desconto do cupom por código.',
+  })
   desconto: number;
 
-  @ApiProperty({ example: 25.8, description: 'total - desconto — o que o cliente paga.' })
+  @ApiProperty({
+    example: 25.8,
+    description: 'total - descontoAtacado - desconto — o que o cliente paga.',
+  })
   totalComDesconto: number;
 
   @ApiPropertyOptional({ example: 'BEMVINDO10' })
   cupomCodigo?: string;
+
+  @ApiPropertyOptional({
+    example: 'Cupom "BEMVINDO10" expirou.',
+    description:
+      'Preenchido só quando um cupom salvo no carrinho deixou de ser válido nesta leitura (expirou, esgotou, o subtotal caiu abaixo do mínimo etc.) — o cupom já foi removido do carrinho, esta é a mensagem pra explicar por quê.',
+  })
+  avisoCupom?: string;
 
   static fromResultado(resultado: ResultadoVisualizacaoCarrinho): CarrinhoSessaoResponseDto {
     const dto = new CarrinhoSessaoResponseDto();
@@ -75,9 +94,11 @@ export class CarrinhoSessaoResponseDto {
       ...item,
     }));
     dto.total = resultado.total;
+    dto.descontoAtacado = resultado.descontoAtacado;
     dto.desconto = resultado.desconto;
     dto.totalComDesconto = resultado.totalComDesconto;
     dto.cupomCodigo = resultado.cupomCodigo;
+    dto.avisoCupom = resultado.avisoCupom;
     return dto;
   }
 }

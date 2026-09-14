@@ -26,6 +26,18 @@ export class CupomResponseDto {
   @ApiPropertyOptional({ example: 100 })
   usoMaximo?: number;
 
+  @ApiPropertyOptional({ example: 50 })
+  valorMinimoPedido?: number;
+
+  @ApiPropertyOptional({ example: 1 })
+  limiteUsoPorCliente?: number;
+
+  @ApiProperty({ type: [String], example: [] })
+  categoriaIds!: string[];
+
+  @ApiProperty({ type: [String], example: [] })
+  produtoIds!: string[];
+
   @ApiProperty({ example: '2026-08-22T18:30:00.000Z' })
   createdAt!: Date;
 
@@ -39,6 +51,10 @@ export class CupomResponseDto {
     dto.usosCount = cupom.usosCount;
     dto.validoAte = cupom.validoAte;
     dto.usoMaximo = cupom.usoMaximo;
+    dto.valorMinimoPedido = cupom.valorMinimoPedido;
+    dto.limiteUsoPorCliente = cupom.limiteUsoPorCliente;
+    dto.categoriaIds = [...cupom.categoriasRestritas];
+    dto.produtoIds = [...cupom.produtosRestritos];
     dto.createdAt = cupom.createdAt;
     return dto;
   }

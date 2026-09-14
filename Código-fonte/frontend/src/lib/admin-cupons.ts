@@ -11,6 +11,10 @@ export interface CupomAdmin {
   usosCount: number;
   validoAte?: string;
   usoMaximo?: number;
+  valorMinimoPedido?: number;
+  limiteUsoPorCliente?: number;
+  categoriaIds: string[];
+  produtoIds: string[];
   createdAt: string;
 }
 
@@ -20,6 +24,10 @@ export interface DadosCriacaoCupomAdmin {
   valor: number;
   validoAte?: string;
   usoMaximo?: number;
+  valorMinimoPedido?: number;
+  limiteUsoPorCliente?: number;
+  categoriaIds?: string[];
+  produtoIds?: string[];
 }
 
 // Sem `codigo` de propósito — o backend rejeita edição do código depois de criado.
@@ -29,6 +37,12 @@ export interface DadosAtualizacaoCupomAdmin {
   ativo?: boolean;
   validoAte?: string;
   usoMaximo?: number;
+  valorMinimoPedido?: number;
+  limiteUsoPorCliente?: number;
+  /** Quando enviado (mesmo array vazio), SUBSTITUI o conjunto inteiro — mesmo
+   * contrato do backend (ver DadosAtualizacaoCupom). */
+  categoriaIds?: string[];
+  produtoIds?: string[];
 }
 
 export function listarCuponsAdmin(): Promise<CupomAdmin[]> {

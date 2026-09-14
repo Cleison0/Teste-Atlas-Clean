@@ -33,8 +33,22 @@ export class DomainExceptionFilter implements ExceptionFilter {
     CEP_NAO_ENCONTRADO: 404,
     CEP_INDISPONIVEL: 503,
     CUPOM_NAO_ENCONTRADO: 404,
+    CUPOM_VALOR_INVALIDO: 400,
     CUPOM_CODIGO_DUPLICADO: 409,
-    CUPOM_INVALIDO: 409,
+    // 409 (não 404): mesmo padrão dos outros motivos de cupom abaixo — "código
+    // digitado não existe" é tratado como o pedido de aplicar cupom conflitando
+    // com o estado atual, não como uma rota/recurso REST que não foi encontrado
+    // (contrato já estabelecido antes deste card — CUPOM_INVALIDO já era 409).
+    CUPOM_CODIGO_INVALIDO: 409,
+    CUPOM_INATIVO: 409,
+    CUPOM_EXPIRADO: 409,
+    CUPOM_ESGOTADO: 409,
+    CUPOM_VALOR_MINIMO_NAO_ATINGIDO: 409,
+    CUPOM_NAO_APLICAVEL_ITENS: 409,
+    CUPOM_LIMITE_USO_CLIENTE_EXCEDIDO: 409,
+    REGRA_ATACADO_NAO_ENCONTRADA: 404,
+    REGRA_ATACADO_VALOR_INVALIDO: 400,
+    REGRA_ATACADO_ALVO_INVALIDO: 400,
     BANNER_NAO_ENCONTRADO: 404,
     CREDENCIAIS_INVALIDAS: 401,
     TOKEN_RECUPERACAO_INVALIDO: 400,

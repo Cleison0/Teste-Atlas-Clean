@@ -16,6 +16,14 @@ export class AtualizarCupomUseCase {
       throw new CupomNaoEncontradoException(id);
     }
 
+    // Valida a combinação RESULTANTE (existente + o que está mudando) — uma
+    // atualização parcial que só troca `valor` ainda precisa respeitar o
+    // tipoDesconto que já estava salvo, e vice-versa.
+    Cupom.validarTipoEValor(
+      dados.tipoDesconto ?? existente.tipoDesconto,
+      dados.valor ?? existente.valor,
+    );
+
     return this.cupomRepository.atualizar(id, dados);
   }
 }

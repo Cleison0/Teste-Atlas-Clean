@@ -36,6 +36,10 @@ export class Produto {
     public readonly marca?: MarcaDoProduto,
     public readonly produtoTipo?: ProdutoTipoDoProduto,
     public readonly precoPromocional?: number,
+    /** FK real pra Categoria — não confundir com `categoria` (texto livre legado,
+     * ainda a fonte do filtro de listagem). Usado só pra elegibilidade de
+     * restrição de cupom/atacado por categoria (ver Cupom.ehElegivel). */
+    public readonly categoriaId?: string,
   ) {}
 
   possuiEstoqueDisponivel(quantidade: number): boolean {
@@ -76,6 +80,7 @@ export class Produto {
       this.marca,
       this.produtoTipo,
       this.precoPromocional,
+      this.categoriaId,
     );
   }
 
@@ -100,6 +105,7 @@ export class Produto {
       this.marca,
       this.produtoTipo,
       this.precoPromocional,
+      this.categoriaId,
     );
   }
 }

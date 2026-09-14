@@ -24,6 +24,7 @@ export default function CarrinhoPage() {
     itens,
     itensIndisponiveis,
     total,
+    descontoAtacado,
     desconto,
     totalComDesconto,
     cupomCodigo,
@@ -147,6 +148,12 @@ export default function CarrinhoPage() {
                 <span>Subtotal</span>
                 <span className="font-mono">{formatarMoeda(total)}</span>
               </div>
+              {descontoAtacado > 0 && (
+                <div className="flex items-center justify-between text-green">
+                  <span>Desconto por atacado</span>
+                  <span className="font-mono">−{formatarMoeda(descontoAtacado)}</span>
+                </div>
+              )}
               {!!cupomCodigo && desconto > 0 && (
                 <div className="flex items-center justify-between text-green">
                   <span>Desconto ({cupomCodigo})</span>
@@ -160,7 +167,7 @@ export default function CarrinhoPage() {
               <div className="mt-1.5 flex items-center justify-between border-t border-dashed border-line pt-2.5 font-display text-base font-bold text-navy">
                 <span>Total</span>
                 <span className="font-mono">
-                  {formatarMoeda(cupomCodigo ? totalComDesconto : total)}
+                  {formatarMoeda(cupomCodigo || descontoAtacado > 0 ? totalComDesconto : total)}
                 </span>
               </div>
             </div>

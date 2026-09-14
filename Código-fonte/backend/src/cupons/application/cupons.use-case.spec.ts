@@ -3,6 +3,7 @@ import { CupomRepository } from '../domain/cupom.repository';
 import {
   CupomCodigoDuplicadoException,
   CupomNaoEncontradoException,
+  CupomValorInvalidoException,
 } from '../domain/cupons.exceptions';
 import { AtualizarCupomUseCase } from './atualizar-cupom.use-case';
 import { CriarCupomUseCase } from './criar-cupom.use-case';
@@ -57,6 +58,17 @@ describe('CriarCupomUseCase', () => {
     ).rejects.toBeInstanceOf(CupomCodigoDuplicadoException);
     expect(cupomRepository.criar).not.toHaveBeenCalled();
   });
+
+  it('lança CupomValorInvalidoException sem persistir nada quando o percentual é maior que 100', async () => {
+    const cupomRepository = criarRepositorioMock();
+
+    const useCase = new CriarCupomUseCase(cupomRepository);
+    await expect(
+      useCase.executar({ codigo: 'PROMO', tipoDesconto: 'PERCENTUAL', valor: 150 }),
+    ).rejects.toBeInstanceOf(CupomValorInvalidoException);
+    expect(cupomRepository.buscarPorCodigo).not.toHaveBeenCalled();
+    expect(cupomRepository.criar).not.toHaveBeenCalled();
+  });
 });
 
 describe('AtualizarCupomUseCase', () => {
@@ -78,6 +90,17 @@ describe('AtualizarCupomUseCase', () => {
     const useCase = new AtualizarCupomUseCase(cupomRepository);
     await expect(useCase.executar('inexistente', { ativo: false })).rejects.toBeInstanceOf(
       CupomNaoEncontradoException,
+    );
+    expect(cupomRepository.atualizar).not.toHaveBeenCalled();
+  });
+
+  it('valida a combinação resultante: trocar só o valor mantendo o tipoDesconto salvo (PERCENTUAL) rejeita acima de 100', async () => {
+    const cupomRepository = criarRepositorioMock();
+    cupomRepository.buscarPorId.mockResolvedValue(criarCupom()); // PERCENTUAL
+
+    const useCase = new AtualizarCupomUseCase(cupomRepository);
+    await expect(useCase.executar('cupom-1', { valor: 200 })).rejects.toBeInstanceOf(
+      CupomValorInvalidoException,
     );
     expect(cupomRepository.atualizar).not.toHaveBeenCalled();
   });

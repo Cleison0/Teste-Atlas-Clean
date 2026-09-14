@@ -8,6 +8,8 @@ export class CriarCupomUseCase {
   constructor(private readonly cupomRepository: CupomRepository) {}
 
   async executar(dados: DadosCriacaoCupom): Promise<Cupom> {
+    Cupom.validarTipoEValor(dados.tipoDesconto, dados.valor);
+
     // Normaliza pra maiúsculo — cupom é digitado pelo cliente no checkout, evita
     // "BEMVINDO10" vs "bemvindo10" virarem códigos diferentes por acidente.
     const codigo = dados.codigo.toUpperCase();

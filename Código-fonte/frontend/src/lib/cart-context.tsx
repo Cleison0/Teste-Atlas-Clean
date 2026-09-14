@@ -1,6 +1,6 @@
 'use client';
 
-import { ReactNode, createContext, useContext, useRef, useState } from 'react';
+import { ReactNode, createContext, useContext, useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/components/ui/Toast';
 import {
@@ -26,6 +26,7 @@ const CARRINHO_VAZIO: CarrinhoServidor = {
   itens: [],
   itensIndisponiveis: [],
   total: 0,
+  descontoAtacado: 0,
   desconto: 0,
   totalComDesconto: 0,
 };
@@ -39,6 +40,9 @@ interface CartContextValue {
   itens: CarrinhoServidor['itens'];
   itensIndisponiveis: CarrinhoServidor['itensIndisponiveis'];
   total: number;
+  /** 0 quando nenhuma regra de atacado (desconto automático por quantidade) se
+   * aplica a nenhum item do carrinho. */
+  descontoAtacado: number;
   /** 0 quando nenhum cupom válido está aplicado (ver Carrinho.cupomCodigo no backend). */
   desconto: number;
   totalComDesconto: number;
@@ -104,7 +108,9 @@ function comQuantidadeOtimista(
     ...carrinho,
     itens,
     total,
-    totalComDesconto: Number((total - carrinho.desconto).toFixed(2)),
+    totalComDesconto: Number(
+      (total - (carrinho.descontoAtacado ?? 0) - carrinho.desconto).toFixed(2),
+    ),
   };
 }
 
@@ -157,6 +163,16 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const carrinho = carrinhoQuery.data ?? CARRINHO_VAZIO;
   const hidratado = !carrinhoQuery.isLoading;
   const quantidadeTotal = carrinho.itens.reduce((soma, item) => soma + item.quantidade, 0);
+
+  // Dispara só quando a MENSAGEM muda de valor (não a cada refetch) — o backend só
+  // preenche avisoCupom na leitura em que um cupom salvo acabou de ser invalidado e
+  // removido; a leitura seguinte já vem sem cupomCodigo, então isso não repete.
+  useEffect(() => {
+    if (carrinho.avisoCupom) {
+      showToast(carrinho.avisoCupom, 'error');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [carrinho.avisoCupom]);
 
   async function adicionar(produtoId: string, quantidade = 1) {
     await adicionarMutation.mutateAsync({ produtoId, quantidade });
@@ -219,6 +235,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         itens: carrinho.itens,
         itensIndisponiveis: carrinho.itensIndisponiveis,
         total: carrinho.total,
+        descontoAtacado: carrinho.descontoAtacado ?? 0,
         desconto: carrinho.desconto,
         totalComDesconto: carrinho.totalComDesconto,
         cupomCodigo: carrinho.cupomCodigo,

@@ -6,8 +6,10 @@ import { ResolverCarrinhoSessaoUseCase } from './resolver-carrinho-sessao.use-ca
 import { ProdutoRepository } from '../../produtos/domain/produto.repository';
 import { Produto } from '../../produtos/domain/produto.entity';
 import { CarrinhoSessao, ItemCarrinhoSessao } from '../domain/carrinho-sessao';
+import { CarrinhoSessaoRepository } from '../domain/carrinho-sessao.repository';
 import { CupomRepository } from '../../cupons/domain/cupom.repository';
 import { Cupom } from '../../cupons/domain/cupom.entity';
+import { CalcularDescontoAtacadoUseCase } from '../../atacado/application/calcular-desconto-atacado.use-case';
 
 function criarCupom(overrides: Partial<Cupom> = {}): Cupom {
   return new Cupom(
@@ -20,6 +22,10 @@ function criarCupom(overrides: Partial<Cupom> = {}): Cupom {
     overrides.createdAt ?? new Date(),
     overrides.validoAte,
     overrides.usoMaximo,
+    overrides.valorMinimoPedido,
+    overrides.limiteUsoPorCliente,
+    overrides.categoriasRestritas ?? [],
+    overrides.produtosRestritos ?? [],
   );
 }
 
@@ -43,6 +49,7 @@ function criarProduto(overrides: Partial<Produto> = {}): Produto {
     overrides.marca,
     overrides.produtoTipo,
     overrides.precoPromocional,
+    overrides.categoriaId,
   );
 }
 
@@ -50,6 +57,8 @@ describe('VisualizarCarrinhoUseCase', () => {
   let resolverCarrinhoSessaoUseCase: jest.Mocked<ResolverCarrinhoSessaoUseCase>;
   let produtoRepository: jest.Mocked<ProdutoRepository>;
   let cupomRepository: jest.Mocked<CupomRepository>;
+  let carrinhoSessaoRepository: jest.Mocked<CarrinhoSessaoRepository>;
+  let calcularDescontoAtacadoUseCase: jest.Mocked<CalcularDescontoAtacadoUseCase>;
   let useCase: VisualizarCarrinhoUseCase;
 
   beforeEach(() => {
@@ -63,12 +72,23 @@ describe('VisualizarCarrinhoUseCase', () => {
 
     cupomRepository = {
       buscarPorCodigo: jest.fn(),
+      contarUsosCliente: jest.fn().mockResolvedValue(0),
     } as unknown as jest.Mocked<CupomRepository>;
+
+    carrinhoSessaoRepository = {
+      definirCupom: jest.fn(),
+    } as unknown as jest.Mocked<CarrinhoSessaoRepository>;
+
+    calcularDescontoAtacadoUseCase = {
+      executar: jest.fn().mockResolvedValue(new Map()),
+    } as unknown as jest.Mocked<CalcularDescontoAtacadoUseCase>;
 
     useCase = new VisualizarCarrinhoUseCase(
       resolverCarrinhoSessaoUseCase,
       produtoRepository,
       cupomRepository,
+      carrinhoSessaoRepository,
+      calcularDescontoAtacadoUseCase,
     );
   });
 
@@ -85,9 +105,11 @@ describe('VisualizarCarrinhoUseCase', () => {
       itens: [],
       itensIndisponiveis: [],
       total: 0,
+      descontoAtacado: 0,
       desconto: 0,
       totalComDesconto: 0,
       cupomCodigo: undefined,
+      avisoCupom: undefined,
     });
     expect(produtoRepository.buscarPorIds).not.toHaveBeenCalled();
     expect(resolverCarrinhoSessaoUseCase.executar).toHaveBeenCalledWith(
@@ -253,6 +275,25 @@ describe('VisualizarCarrinhoUseCase', () => {
     expect(resultado.sessionToken).toBe('token-existente');
   });
 
+  describe('atacado', () => {
+    it('desconto de atacado aparece separado do desconto de cupom e reduz totalComDesconto', async () => {
+      resolverCarrinhoSessaoUseCase.executar.mockResolvedValue({
+        carrinho: new CarrinhoSessao('carrinho-1', 'token-1', undefined, [
+          new ItemCarrinhoSessao('produto-1', 12),
+        ]),
+        sessionTokenNovo: undefined,
+      });
+      produtoRepository.buscarPorIds.mockResolvedValue([criarProduto({ preco: 10, estoque: 20 })]);
+      calcularDescontoAtacadoUseCase.executar.mockResolvedValue(new Map([['produto-1', 20]]));
+
+      const resultado = await useCase.executar('token-1', undefined);
+
+      expect(resultado.total).toBe(120);
+      expect(resultado.descontoAtacado).toBe(20);
+      expect(resultado.totalComDesconto).toBe(100);
+    });
+  });
+
   describe('cupom', () => {
     it('aplica desconto do cupom salvo no carrinho, se ainda for válido', async () => {
       resolverCarrinhoSessaoUseCase.executar.mockResolvedValue({
@@ -275,9 +316,11 @@ describe('VisualizarCarrinhoUseCase', () => {
       expect(resultado.desconto).toBe(2);
       expect(resultado.totalComDesconto).toBe(18);
       expect(resultado.cupomCodigo).toBe('DESCONTO10');
+      expect(resultado.avisoCupom).toBeUndefined();
+      expect(carrinhoSessaoRepository.definirCupom).not.toHaveBeenCalled();
     });
 
-    it('cupom salvo mas expirado não aplica desconto (sem lançar erro)', async () => {
+    it('cupom salvo mas expirado é removido do carrinho e devolve avisoCupom com o motivo', async () => {
       resolverCarrinhoSessaoUseCase.executar.mockResolvedValue({
         carrinho: new CarrinhoSessao(
           'carrinho-1',
@@ -299,6 +342,34 @@ describe('VisualizarCarrinhoUseCase', () => {
       expect(resultado.desconto).toBe(0);
       expect(resultado.totalComDesconto).toBe(20);
       expect(resultado.cupomCodigo).toBeUndefined();
+      expect(resultado.avisoCupom).toContain('expirou');
+      expect(carrinhoSessaoRepository.definirCupom).toHaveBeenCalledWith(
+        'carrinho-1',
+        null,
+        expect.any(Date),
+      );
+    });
+
+    it('cupom salvo mas abaixo do valor mínimo (item removido baixou o subtotal) é removido com aviso específico', async () => {
+      resolverCarrinhoSessaoUseCase.executar.mockResolvedValue({
+        carrinho: new CarrinhoSessao(
+          'carrinho-1',
+          'token-1',
+          undefined,
+          [new ItemCarrinhoSessao('produto-1', 1)],
+          undefined,
+          'DESCONTO10',
+        ),
+        sessionTokenNovo: undefined,
+      });
+      produtoRepository.buscarPorIds.mockResolvedValue([criarProduto({ preco: 10 })]);
+      cupomRepository.buscarPorCodigo.mockResolvedValue(criarCupom({ valorMinimoPedido: 50 }));
+
+      const resultado = await useCase.executar('token-1', undefined);
+
+      expect(resultado.cupomCodigo).toBeUndefined();
+      expect(resultado.avisoCupom).toContain('50');
+      expect(carrinhoSessaoRepository.definirCupom).toHaveBeenCalled();
     });
 
     it('sem cupom salvo, desconto fica 0 sem consultar CupomRepository', async () => {

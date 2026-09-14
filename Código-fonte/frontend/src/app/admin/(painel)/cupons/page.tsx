@@ -13,8 +13,16 @@ import {
   listarBannersAdmin,
   type BannerAdmin,
 } from '@/lib/admin-banners';
+import {
+  atualizarRegraAtacadoAdmin,
+  listarRegrasAtacadoAdmin,
+  type RegraAtacadoAdmin,
+} from '@/lib/admin-atacado';
+import { listarProdutosAdmin } from '@/lib/admin-produtos';
+import { listarCategorias } from '@/lib/categorias';
 import { CupomFormModal } from './CupomFormModal';
 import { BannerFormModal } from './BannerFormModal';
+import { RegraAtacadoFormModal } from './RegraAtacadoFormModal';
 
 function formatarMoeda(valor: number): string {
   return valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -275,11 +283,140 @@ function SecaoBanners() {
   );
 }
 
+function SecaoAtacado() {
+  const queryClient = useQueryClient();
+  const { showToast } = useToast();
+  const [regraEmEdicao, setRegraEmEdicao] = useState<RegraAtacadoAdmin | null | undefined>(null);
+
+  const regrasQuery = useQuery({
+    queryKey: ['admin', 'regras-atacado'],
+    queryFn: listarRegrasAtacadoAdmin,
+  });
+  // Mesma fonte usada pelo modal (produtos/categorias) — só pra resolver id → nome
+  // nesta tabela, não precisa recarregar a cada abertura do modal (react-query
+  // compartilha o cache pela mesma queryKey).
+  const produtosQuery = useQuery({
+    queryKey: ['admin', 'produtos', 'todos'],
+    queryFn: () => listarProdutosAdmin({ pagina: 1, limite: 300 }),
+  });
+  const categoriasQuery = useQuery({
+    queryKey: ['categorias'],
+    queryFn: () => listarCategorias(),
+  });
+
+  const statusMutation = useMutation({
+    mutationFn: ({ id, ativo }: { id: string; ativo: boolean }) =>
+      atualizarRegraAtacadoAdmin(id, { ativo }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'regras-atacado'] });
+    },
+    onError: (erro) => {
+      showToast(erro instanceof ApiError ? erro.message : 'Erro ao alterar status.', 'error');
+    },
+  });
+
+  const regras = regrasQuery.data ?? [];
+
+  function nomeDoAlvo(regra: RegraAtacadoAdmin): string {
+    if (regra.produtoId) {
+      const produto = produtosQuery.data?.itens.find((p) => p.id === regra.produtoId);
+      return produto
+        ? [produto.nome, produto.marca?.nome, produto.pack].filter(Boolean).join(' — ')
+        : regra.produtoId;
+    }
+    const categoria = categoriasQuery.data?.find((c) => c.id === regra.categoriaId);
+    return categoria ? `Categoria: ${categoria.nome}` : (regra.categoriaId ?? '—');
+  }
+
+  return (
+    <section className="mt-10">
+      <div className="mb-4 flex items-center justify-between gap-4">
+        <h2 className="font-display text-lg font-bold text-navy">Desconto por atacado</h2>
+        <Button size="sm" onClick={() => setRegraEmEdicao(undefined)}>
+          + Nova regra
+        </Button>
+      </div>
+
+      <div className="overflow-x-auto rounded-atlas border border-line bg-white shadow-atlas">
+        <table className="w-full text-[13px]">
+          <thead>
+            <tr className="bg-sky text-left text-[11px] uppercase tracking-wide text-navy">
+              <th className="px-3.5 py-2.5">Alvo</th>
+              <th className="px-3.5 py-2.5">A partir de</th>
+              <th className="px-3.5 py-2.5">Desconto</th>
+              <th className="px-3.5 py-2.5">Status</th>
+              <th className="px-3.5 py-2.5">Ações</th>
+            </tr>
+          </thead>
+          <tbody>
+            {regrasQuery.isLoading && (
+              <tr>
+                <td colSpan={5} className="px-3.5 py-6 text-center text-muted">
+                  Carregando…
+                </td>
+              </tr>
+            )}
+            {!regrasQuery.isLoading && regras.length === 0 && (
+              <tr>
+                <td colSpan={5} className="px-3.5 py-6 text-center text-muted">
+                  Nenhuma regra de atacado cadastrada.
+                </td>
+              </tr>
+            )}
+            {regras.map((regra) => (
+              <tr key={regra.id} className="border-t border-line">
+                <td className="px-3.5 py-2.5 font-medium text-ink">{nomeDoAlvo(regra)}</td>
+                <td className="px-3.5 py-2.5 text-muted">{regra.quantidadeMinima} un.</td>
+                <td className="px-3.5 py-2.5">
+                  {regra.tipoDesconto === 'PERCENTUAL'
+                    ? `${regra.valor}%`
+                    : formatarMoeda(regra.valor)}
+                </td>
+                <td className="px-3.5 py-2.5">
+                  <Badge variant={regra.ativo ? 'green' : 'sky'}>
+                    {regra.ativo ? 'Ativa' : 'Inativa'}
+                  </Badge>
+                </td>
+                <td className="px-3.5 py-2.5">
+                  <div className="flex flex-wrap gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setRegraEmEdicao(regra)}
+                      className="rounded-atlas-sm bg-sky px-2.5 py-1.5 text-[12px] font-semibold text-navy hover:bg-blue/20"
+                    >
+                      Editar
+                    </button>
+                    <button
+                      type="button"
+                      disabled={statusMutation.isPending}
+                      onClick={() => statusMutation.mutate({ id: regra.id, ativo: !regra.ativo })}
+                      className="rounded-atlas-sm bg-red-50 px-2.5 py-1.5 text-[12px] font-semibold text-red-600 hover:bg-red-100 disabled:opacity-50"
+                    >
+                      {regra.ativo ? 'Desativar' : 'Ativar'}
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <RegraAtacadoFormModal
+        regra={regraEmEdicao}
+        aberto={regraEmEdicao !== null}
+        onClose={() => setRegraEmEdicao(null)}
+      />
+    </section>
+  );
+}
+
 export default function CuponsAdminPage() {
   return (
     <div>
       <h1 className="mb-6 font-display text-2xl font-bold text-navy">Cupons & banners</h1>
       <SecaoCupons />
+      <SecaoAtacado />
       <SecaoBanners />
     </div>
   );
