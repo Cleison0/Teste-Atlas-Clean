@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { EstoqueInsuficienteException } from '../../carrinho/domain/carrinho.exceptions';
 import { ProdutoRepository } from '../../produtos/domain/produto.repository';
 import { CupomRepository } from '../../cupons/domain/cupom.repository';
+import { CupomEsgotadoException } from '../../cupons/domain/cupons.exceptions';
 import { PedidoRepository } from '../../pedidos/domain/pedido.repository';
 import { Pedido } from '../../pedidos/domain/pedido.entity';
 import {
@@ -106,6 +107,13 @@ export class ReconciliarPedidoService {
       );
       if (pedido.cupomCodigo) {
         await this.cupomRepository.decrementarUsos(pedido.cupomCodigo, contexto);
+        if (pedido.clienteId) {
+          await this.cupomRepository.decrementarUsoCliente(
+            pedido.cupomCodigo,
+            pedido.clienteId,
+            contexto,
+          );
+        }
       }
     });
   }
@@ -132,7 +140,18 @@ export class ReconciliarPedidoService {
           contexto,
         );
         if (pedido.cupomCodigo) {
+          // Ordem importa: o guard atômico contra usoMaximo está em incrementarUsos
+          // (updateMany condicional) — se ele lançar CupomEsgotadoException, o
+          // incrementarUsoCliente abaixo nunca roda, e o rollback da transação desfaz
+          // o decremento de estoque já feito acima.
           await this.cupomRepository.incrementarUsos(pedido.cupomCodigo, contexto);
+          if (pedido.clienteId) {
+            await this.cupomRepository.incrementarUsoCliente(
+              pedido.cupomCodigo,
+              pedido.clienteId,
+              contexto,
+            );
+          }
         }
         await this.pedidoRepository.atualizarStatus(pedido.id, StatusPedido.PAGO, contexto);
       });
@@ -146,6 +165,18 @@ export class ReconciliarPedidoService {
           `Pagamento ${pagamento.id} do pedido ${pedido.id} foi aprovado pelo gateway, mas o estoque ` +
             `não está mais disponível (${erro.message}). O pedido NÃO foi marcado como PAGO. ` +
             'Requer reconciliação manual — provavelmente estornar o cliente.',
+        );
+        return;
+      }
+      if (erro instanceof CupomEsgotadoException) {
+        // Mesma anomalia do estoque insuficiente acima: o pagamento (já com o
+        // desconto aplicado) foi capturado pelo gateway antes de outra confirmação
+        // simultânea esgotar o cupom por último. Não marca como PAGO — decidir
+        // manualmente (normalmente: honrar o desconto mesmo assim, ou estornar).
+        this.logger.error(
+          `Pagamento ${pagamento.id} do pedido ${pedido.id} foi aprovado pelo gateway, mas o cupom ` +
+            `"${pedido.cupomCodigo}" esgotou nesse meio tempo. O pedido NÃO foi marcado como PAGO. ` +
+            'Requer reconciliação manual.',
         );
         return;
       }

@@ -295,6 +295,7 @@ export class PrismaProdutoRepository extends ProdutoRepository {
           }
         : undefined,
       produto.precoPromocional !== null ? Number(produto.precoPromocional) : undefined,
+      produto.categoriaId ?? undefined,
     );
   }
 }

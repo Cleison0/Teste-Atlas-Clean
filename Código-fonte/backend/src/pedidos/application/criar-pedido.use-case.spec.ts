@@ -336,6 +336,7 @@ describe('CriarPedidoUseCase', () => {
     expect(montarCarrinhoUseCase.executar).toHaveBeenCalledWith(
       [{ produtoId: 'produto-1', quantidade: 2 }],
       'DESCONTO10',
+      undefined,
     );
     expect(pedidoRepository.criar).toHaveBeenCalledWith(
       expect.any(Array),

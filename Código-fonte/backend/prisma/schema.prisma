@@ -64,8 +64,10 @@ model Categoria {
   slug String @unique
   nome String
 
-  produtoTipos ProdutoTipo[]
-  produtos     Produto[]
+  produtoTipos    ProdutoTipo[]
+  produtos        Produto[]
+  cuponsRestritos CupomCategoria[]
+  regrasAtacado   RegraAtacado[]
 
   @@map("categorias")
 }
@@ -108,26 +110,26 @@ model ProdutoTipo {
 }
 
 model Produto {
-  id            String  @id @default(uuid())
-  nome          String
+  id               String   @id @default(uuid())
+  nome             String
   // Embalagem/variante (ex: "500ml") do modelo original — nenhum fluxo de
   // criação/edição atual preenche isso ainda, por isso ficou opcional.
-  pack          String?
-  descricao     String?
-  slug          String  @unique
-  produtoTipoId String? @map("produto_tipo_id")
-  marcaId       String? @map("marca_id")
-  categoriaId   String? @map("categoria_id")
+  pack             String?
+  descricao        String?
+  slug             String   @unique
+  produtoTipoId    String?  @map("produto_tipo_id")
+  marcaId          String?  @map("marca_id")
+  categoriaId      String?  @map("categoria_id")
   // Categoria em texto livre, herdada do modelo antigo. Ainda é a fonte do filtro
   // de listagem e do ProdutoResponseDto; sai quando os dados forem migrados para
   // categoriaId. As três FKs acima são opcionais porque já existem produtos no
   // banco sem essa classificação.
-  categoria     String?
-  preco         Decimal @db.Decimal(10, 2)
+  categoria        String?
+  preco            Decimal  @db.Decimal(10, 2)
   // Promoção ativa = campo preenchido (a invariante precoPromocional < preco é
   // garantida na escrita, pela camada de aplicação — não há checagem no banco).
   precoPromocional Decimal? @map("preco_promocional") @db.Decimal(10, 2)
-  estoque       Int     @default(0)
+  estoque          Int      @default(0)
 
   // Dados físicos usados para cotação de frete.
   // Opcionais para manter compatibilidade com produtos já cadastrados.
@@ -148,6 +150,8 @@ model Produto {
   itensCarrinho        ItemCarrinho[]
   imagens              ImagemProduto[]
   movimentacoesEstoque MovimentacaoEstoque[]
+  cuponsRestritos      CupomProduto[]
+  regrasAtacado        RegraAtacado[]
 
   @@index([nome])
   @@index([categoria])
@@ -224,6 +228,7 @@ model Cliente {
   carrinhos         Carrinho[]
   tokensRecuperacao TokenRecuperacaoSenha[]
   refreshTokens     RefreshToken[]
+  usosCupom         CupomUsoCliente[]
 
   @@map("clientes")
 }
@@ -289,20 +294,99 @@ model Endereco {
 }
 
 model Cupom {
-  id           String       @id @default(uuid())
-  codigo       String       @unique
-  tipoDesconto TipoDesconto @map("tipo_desconto")
-  valor        Decimal      @db.Decimal(10, 2)
-  ativo        Boolean      @default(true)
-  validoAte    DateTime?    @map("valido_ate")
-  usoMaximo    Int?         @map("uso_maximo")
-  usosCount    Int          @default(0) @map("usos_count")
-  createdAt    DateTime     @default(now()) @map("created_at")
+  id                  String       @id @default(uuid())
+  codigo              String       @unique
+  tipoDesconto        TipoDesconto @map("tipo_desconto")
+  valor               Decimal      @db.Decimal(10, 2)
+  ativo               Boolean      @default(true)
+  validoAte           DateTime?    @map("valido_ate")
+  usoMaximo           Int?         @map("uso_maximo")
+  usosCount           Int          @default(0) @map("usos_count")
+  // Pedido inteiro (sem desconto de atacado) precisa somar pelo menos isso pro cupom
+  // poder ser aplicado. Checado contra o subtotal de TODO o carrinho, não só a parte
+  // elegível — "gaste X, ganhe Y de desconto" é sobre o valor total da compra.
+  valorMinimoPedido   Decimal?     @map("valor_minimo_pedido") @db.Decimal(10, 2)
+  // Limite adicional POR CLIENTE, independente do usoMaximo global — só é
+  // verificado quando o carrinho/pedido tem clienteId (convidado nunca é limitado
+  // por aqui). Contagem fica em CupomUsoCliente, incrementada/decrementada no
+  // mesmo momento e pela mesma transação que usosCount acima.
+  limiteUsoPorCliente Int?         @map("limite_uso_por_cliente")
+  createdAt           DateTime     @default(now()) @map("created_at")
 
-  pedidos   Pedido[]
-  carrinhos Carrinho[]
+  pedidos        Pedido[]
+  carrinhos      Carrinho[]
+  categorias     CupomCategoria[]
+  produtos       CupomProduto[]
+  usosPorCliente CupomUsoCliente[]
 
   @@map("cupons")
+}
+
+// Restrição do cupom a categorias específicas — ausência de linhas aqui (e em
+// CupomProduto) significa "sem restrição, aplica ao carrinho inteiro" (ver
+// Cupom.ehElegivel no domínio). N:N de propósito: um cupom pode restringir a mais
+// de uma categoria, mesma categoria pode estar em mais de um cupom.
+model CupomCategoria {
+  cupomCodigo String @map("cupom_codigo")
+  categoriaId String @map("categoria_id")
+
+  cupom     Cupom     @relation(fields: [cupomCodigo], references: [codigo], onDelete: Cascade)
+  categoria Categoria @relation(fields: [categoriaId], references: [id], onDelete: Cascade)
+
+  @@id([cupomCodigo, categoriaId])
+  @@map("cupons_categorias")
+}
+
+// Restrição do cupom a produtos específicos — mesma lógica de CupomCategoria, só
+// que no nível de produto (mais granular; um cupom pode ter as duas restrições
+// juntas — elegibilidade de um item é "categoria OU produto bate", ver domínio).
+model CupomProduto {
+  cupomCodigo String @map("cupom_codigo")
+  produtoId   String @map("produto_id")
+
+  cupom   Cupom   @relation(fields: [cupomCodigo], references: [codigo], onDelete: Cascade)
+  produto Produto @relation(fields: [produtoId], references: [id], onDelete: Cascade)
+
+  @@id([cupomCodigo, produtoId])
+  @@map("cupons_produtos")
+}
+
+// Contagem de uso por cliente, espelhando Cupom.usosCount (global) mas por
+// clienteId — incrementada/decrementada na mesma transação de confirmação de
+// pagamento (ver ReconciliarPedidoService), nunca na aplicação ao carrinho.
+model CupomUsoCliente {
+  cupomCodigo String @map("cupom_codigo")
+  clienteId   String @map("cliente_id")
+  usos        Int    @default(0)
+
+  cupom   Cupom   @relation(fields: [cupomCodigo], references: [codigo], onDelete: Cascade)
+  cliente Cliente @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+
+  @@id([cupomCodigo, clienteId])
+  @@map("cupons_uso_cliente")
+}
+
+// Desconto automático por faixa de quantidade (ex.: "leve 12+ unidades, 10% off"),
+// sem código — bem diferente de Cupom por natureza (política de preço do produto,
+// não uma promoção pontual digitada). produtoId e categoriaId são mutuamente
+// exclusivos (exatamente um preenchido) — validado na aplicação, não no banco (Prisma
+// não expressa XOR entre colunas nullable). Aplicado antes de qualquer Cupom por
+// código (ver ItemPrecificado/MontarCarrinhoUseCase): reduz o subtotal primeiro, o
+// cupom por código desconta em cima do que sobrar — as duas coisas se somam.
+model RegraAtacado {
+  id               String       @id @default(uuid())
+  produtoId        String?      @map("produto_id")
+  categoriaId      String?      @map("categoria_id")
+  quantidadeMinima Int          @map("quantidade_minima")
+  tipoDesconto     TipoDesconto @map("tipo_desconto")
+  valor            Decimal      @db.Decimal(10, 2)
+  ativo            Boolean      @default(true)
+  createdAt        DateTime     @default(now()) @map("created_at")
+
+  produto   Produto?   @relation(fields: [produtoId], references: [id], onDelete: Cascade)
+  categoria Categoria? @relation(fields: [categoriaId], references: [id], onDelete: Cascade)
+
+  @@map("regras_atacado")
 }
 
 // Sem consumo pelo storefront ainda (isso é escopo do cartão "Home / vitrine") —
@@ -375,9 +459,9 @@ model Pedido {
   // concorrência em mais de um lugar.
   numero String @unique
 
-  clienteId String?      @map("cliente_id")
-  status    StatusPedido @default(CRIADO)
-  total     Decimal      @db.Decimal(10, 2)
+  clienteId   String?      @map("cliente_id")
+  status      StatusPedido @default(CRIADO)
+  total       Decimal      @db.Decimal(10, 2)
   desconto    Decimal      @default(0) @db.Decimal(10, 2)
   cupomCodigo String?      @map("cupom_codigo")
   createdAt   DateTime     @default(now()) @map("created_at")

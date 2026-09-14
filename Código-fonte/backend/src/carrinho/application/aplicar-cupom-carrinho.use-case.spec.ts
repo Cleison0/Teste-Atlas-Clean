@@ -3,28 +3,17 @@ import { ResolverCarrinhoSessaoUseCase } from './resolver-carrinho-sessao.use-ca
 import { CarrinhoSessaoRepository } from '../domain/carrinho-sessao.repository';
 import { CarrinhoSessao, ItemCarrinhoSessao } from '../domain/carrinho-sessao';
 import { CarrinhoVazioException } from '../domain/carrinho.exceptions';
-import { CupomRepository } from '../../cupons/domain/cupom.repository';
-import { Cupom } from '../../cupons/domain/cupom.entity';
-import { CupomInvalidoException } from '../../cupons/domain/cupons.exceptions';
-
-function criarCupom(overrides: Partial<Cupom> = {}): Cupom {
-  return new Cupom(
-    overrides.id ?? 'cupom-1',
-    overrides.codigo ?? 'DESCONTO10',
-    overrides.tipoDesconto ?? 'PERCENTUAL',
-    overrides.valor ?? 10,
-    overrides.ativo ?? true,
-    overrides.usosCount ?? 0,
-    overrides.createdAt ?? new Date(),
-    overrides.validoAte,
-    overrides.usoMaximo,
-  );
-}
+import { Carrinho, ItemPrecificado } from '../domain/item-precificado';
+import { MontarCarrinhoUseCase } from './montar-carrinho.use-case';
+import {
+  CupomCodigoInvalidoException,
+  CupomInativoException,
+} from '../../cupons/domain/cupons.exceptions';
 
 describe('AplicarCupomCarrinhoUseCase', () => {
   let resolverCarrinhoSessaoUseCase: jest.Mocked<ResolverCarrinhoSessaoUseCase>;
   let carrinhoSessaoRepository: jest.Mocked<CarrinhoSessaoRepository>;
-  let cupomRepository: jest.Mocked<CupomRepository>;
+  let montarCarrinhoUseCase: jest.Mocked<MontarCarrinhoUseCase>;
   let useCase: AplicarCupomCarrinhoUseCase;
 
   const carrinhoComItens = new CarrinhoSessao('carrinho-1', 'token-1', undefined, [
@@ -40,14 +29,18 @@ describe('AplicarCupomCarrinhoUseCase', () => {
       definirCupom: jest.fn(),
     } as unknown as jest.Mocked<CarrinhoSessaoRepository>;
 
-    cupomRepository = {
-      buscarPorCodigo: jest.fn(),
-    } as unknown as jest.Mocked<CupomRepository>;
+    montarCarrinhoUseCase = {
+      executar: jest
+        .fn()
+        .mockResolvedValue(
+          new Carrinho([new ItemPrecificado('produto-1', 'Detergente', 2, 10)], 2, 'DESCONTO10'),
+        ),
+    } as unknown as jest.Mocked<MontarCarrinhoUseCase>;
 
     useCase = new AplicarCupomCarrinhoUseCase(
       resolverCarrinhoSessaoUseCase,
       carrinhoSessaoRepository,
-      cupomRepository,
+      montarCarrinhoUseCase,
     );
   });
 
@@ -60,7 +53,7 @@ describe('AplicarCupomCarrinhoUseCase', () => {
     await expect(useCase.executar(undefined, undefined, 'DESCONTO10')).rejects.toBeInstanceOf(
       CarrinhoVazioException,
     );
-    expect(cupomRepository.buscarPorCodigo).not.toHaveBeenCalled();
+    expect(montarCarrinhoUseCase.executar).not.toHaveBeenCalled();
   });
 
   it('lança CarrinhoVazioException quando o carrinho existe mas está sem itens', async () => {
@@ -74,51 +67,56 @@ describe('AplicarCupomCarrinhoUseCase', () => {
     );
   });
 
-  it('lança CupomInvalidoException quando o código não existe', async () => {
+  it('propaga CupomCodigoInvalidoException do MontarCarrinhoUseCase quando o código não existe', async () => {
     resolverCarrinhoSessaoUseCase.executar.mockResolvedValue({
       carrinho: carrinhoComItens,
       sessionTokenNovo: undefined,
     });
-    cupomRepository.buscarPorCodigo.mockResolvedValue(null);
+    montarCarrinhoUseCase.executar.mockRejectedValue(
+      new CupomCodigoInvalidoException('INEXISTENTE'),
+    );
 
     await expect(useCase.executar('token-1', undefined, 'INEXISTENTE')).rejects.toBeInstanceOf(
-      CupomInvalidoException,
+      CupomCodigoInvalidoException,
     );
     expect(carrinhoSessaoRepository.definirCupom).not.toHaveBeenCalled();
   });
 
-  it('lança CupomInvalidoException quando o cupom existe mas não está mais válido', async () => {
+  it('propaga a exceção específica do MontarCarrinhoUseCase (ex.: cupom inativo) sem persistir nada', async () => {
     resolverCarrinhoSessaoUseCase.executar.mockResolvedValue({
       carrinho: carrinhoComItens,
       sessionTokenNovo: undefined,
     });
-    cupomRepository.buscarPorCodigo.mockResolvedValue(criarCupom({ ativo: false }));
+    montarCarrinhoUseCase.executar.mockRejectedValue(new CupomInativoException('DESCONTO10'));
 
     await expect(useCase.executar('token-1', undefined, 'DESCONTO10')).rejects.toBeInstanceOf(
-      CupomInvalidoException,
+      CupomInativoException,
+    );
+    expect(carrinhoSessaoRepository.definirCupom).not.toHaveBeenCalled();
+  });
+
+  it('valida contra o mesmo carrinho persistido (produtoId/quantidade) e repassa o clienteId', async () => {
+    resolverCarrinhoSessaoUseCase.executar.mockResolvedValue({
+      carrinho: carrinhoComItens,
+      sessionTokenNovo: undefined,
+    });
+
+    await useCase.executar('token-1', 'cliente-1', 'desconto10');
+
+    expect(montarCarrinhoUseCase.executar).toHaveBeenCalledWith(
+      [{ produtoId: 'produto-1', quantidade: 2 }],
+      'desconto10',
+      'cliente-1',
     );
   });
 
-  it('normaliza o código pra maiúsculo antes de buscar', async () => {
+  it('salva o cupom (normalizado pra maiúsculo) no carrinho e devolve o sessionToken quando tudo é válido', async () => {
     resolverCarrinhoSessaoUseCase.executar.mockResolvedValue({
       carrinho: carrinhoComItens,
       sessionTokenNovo: undefined,
     });
-    cupomRepository.buscarPorCodigo.mockResolvedValue(criarCupom());
 
-    await useCase.executar('token-1', undefined, 'desconto10');
-
-    expect(cupomRepository.buscarPorCodigo).toHaveBeenCalledWith('DESCONTO10');
-  });
-
-  it('salva o cupom no carrinho e devolve o sessionToken quando tudo é válido', async () => {
-    resolverCarrinhoSessaoUseCase.executar.mockResolvedValue({
-      carrinho: carrinhoComItens,
-      sessionTokenNovo: undefined,
-    });
-    cupomRepository.buscarPorCodigo.mockResolvedValue(criarCupom());
-
-    const resultado = await useCase.executar('token-1', undefined, 'DESCONTO10');
+    const resultado = await useCase.executar('token-1', undefined, 'desconto10');
 
     expect(carrinhoSessaoRepository.definirCupom).toHaveBeenCalledWith(
       'carrinho-1',

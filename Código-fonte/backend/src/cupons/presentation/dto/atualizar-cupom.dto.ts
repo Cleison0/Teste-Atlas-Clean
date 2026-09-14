@@ -1,6 +1,17 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsBoolean, IsDate, IsIn, IsInt, IsNumber, IsOptional, Min } from 'class-validator';
+import {
+  ArrayUnique,
+  IsArray,
+  IsBoolean,
+  IsDate,
+  IsIn,
+  IsInt,
+  IsNumber,
+  IsOptional,
+  IsString,
+  Min,
+} from 'class-validator';
 import { TipoDesconto } from '../../domain/cupom.entity';
 
 // Sem `codigo` de propósito — ver comentário em AtualizarCupomUseCase.
@@ -32,4 +43,38 @@ export class AtualizarCupomDto {
   @IsInt()
   @Min(1)
   usoMaximo?: number;
+
+  @ApiPropertyOptional({ example: 50, minimum: 0 })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  valorMinimoPedido?: number;
+
+  @ApiPropertyOptional({ example: 1, minimum: 1 })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  limiteUsoPorCliente?: number;
+
+  @ApiPropertyOptional({
+    type: [String],
+    description:
+      'Quando enviado (mesmo array vazio), SUBSTITUI o conjunto de categorias restritas inteiro.',
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayUnique()
+  @IsString({ each: true })
+  categoriaIds?: string[];
+
+  @ApiPropertyOptional({
+    type: [String],
+    description:
+      'Quando enviado (mesmo array vazio), SUBSTITUI o conjunto de produtos restritos inteiro.',
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayUnique()
+  @IsString({ each: true })
+  produtoIds?: string[];
 }

@@ -54,6 +54,13 @@ export class AtualizarStatusPedidoUseCase {
         );
         if (pedido.cupomCodigo) {
           await this.cupomRepository.incrementarUsos(pedido.cupomCodigo, contexto);
+          if (pedido.clienteId) {
+            await this.cupomRepository.incrementarUsoCliente(
+              pedido.cupomCodigo,
+              pedido.clienteId,
+              contexto,
+            );
+          }
         }
         return this.pedidoRepository.atualizarStatus(id, novoStatus, contexto);
       });
@@ -82,6 +89,13 @@ export class AtualizarStatusPedidoUseCase {
       );
       if (pedido.cupomCodigo) {
         await this.cupomRepository.decrementarUsos(pedido.cupomCodigo, contexto);
+        if (pedido.clienteId) {
+          await this.cupomRepository.decrementarUsoCliente(
+            pedido.cupomCodigo,
+            pedido.clienteId,
+            contexto,
+          );
+        }
       }
       return atualizado;
     });

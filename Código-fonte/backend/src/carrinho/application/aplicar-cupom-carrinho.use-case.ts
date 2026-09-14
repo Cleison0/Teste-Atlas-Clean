@@ -5,8 +5,7 @@ import {
 } from './resolver-carrinho-sessao.use-case';
 import { CarrinhoSessaoRepository } from '../domain/carrinho-sessao.repository';
 import { CarrinhoVazioException } from '../domain/carrinho.exceptions';
-import { CupomRepository } from '../../cupons/domain/cupom.repository';
-import { CupomInvalidoException } from '../../cupons/domain/cupons.exceptions';
+import { MontarCarrinhoUseCase } from './montar-carrinho.use-case';
 
 /** Não cria carrinho pra aplicar cupom (criarSeNaoExistir: false) — não tem o que
  * descontar num carrinho vazio/inexistente, então isso é erro do cliente, não um
@@ -16,7 +15,7 @@ export class AplicarCupomCarrinhoUseCase {
   constructor(
     private readonly resolverCarrinhoSessaoUseCase: ResolverCarrinhoSessaoUseCase,
     private readonly carrinhoSessaoRepository: CarrinhoSessaoRepository,
-    private readonly cupomRepository: CupomRepository,
+    private readonly montarCarrinhoUseCase: MontarCarrinhoUseCase,
   ) {}
 
   async executar(
@@ -33,17 +32,20 @@ export class AplicarCupomCarrinhoUseCase {
       throw new CarrinhoVazioException();
     }
 
-    // CriarCupomUseCase sempre normaliza o código pra maiúsculo antes de gravar —
-    // normaliza aqui também, senão um cliente digitando minúsculo nunca acharia
-    // um cupom que existe (mesmo cuidado de MontarCarrinhoUseCase).
-    const cupom = await this.cupomRepository.buscarPorCodigo(cupomCodigo.toUpperCase());
-    if (!cupom || !cupom.estaValido()) {
-      throw new CupomInvalidoException(cupomCodigo);
-    }
+    // Reaproveita MontarCarrinhoUseCase como única fonte de verdade sobre "esse
+    // cupom se aplica a este carrinho" — mesmo cálculo de preço/atacado/elegibilidade
+    // que VisualizarCarrinhoUseCase usa depois pra montar a resposta. Lança a
+    // exceção específica (CupomExpiradoException, CupomValorMinimoNaoAtingidoException
+    // etc.) direto pro controller se não passar — não persiste nada nesse caso.
+    await this.montarCarrinhoUseCase.executar(
+      carrinho.itens.map((item) => ({ produtoId: item.produtoId, quantidade: item.quantidade })),
+      cupomCodigo,
+      clienteId,
+    );
 
     await this.carrinhoSessaoRepository.definirCupom(
       carrinho.id,
-      cupom.codigo,
+      cupomCodigo.toUpperCase(),
       calcularExpiracao(),
     );
     return carrinho.sessionToken;
