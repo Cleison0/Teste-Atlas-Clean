@@ -1,4 +1,8 @@
 import { TipoDesconto } from '../../cupons/domain/cupom.entity';
+import {
+  RegraAtacadoAlvoInvalidoException,
+  RegraAtacadoValorInvalidoException,
+} from './regra-atacado.exceptions';
 
 /** Desconto automático por faixa de quantidade — sem código, política de preço do
  * produto/categoria, não uma promoção pontual (ver Cupom, que é o outro tipo de
@@ -15,17 +19,39 @@ export class RegraAtacado {
     public readonly produtoId?: string,
     public readonly categoriaId?: string,
   ) {
+    RegraAtacado.validarAlvo(produtoId, categoriaId);
+    RegraAtacado.validarQuantidadeETipoValor(quantidadeMinima, tipoDesconto, valor);
+  }
+
+  /** Chamado pelo construtor E diretamente pelos use cases de criação, ANTES de
+   * escrever no banco — mesmo padrão de Cupom.validarTipoEValor. */
+  static validarAlvo(produtoId: string | undefined, categoriaId: string | undefined): void {
     if (!!produtoId === !!categoriaId) {
-      throw new Error('RegraAtacado precisa de exatamente um entre produtoId e categoriaId.');
+      throw new RegraAtacadoAlvoInvalidoException(
+        'RegraAtacado precisa de exatamente um entre produtoId e categoriaId.',
+      );
     }
+  }
+
+  static validarQuantidadeETipoValor(
+    quantidadeMinima: number,
+    tipoDesconto: TipoDesconto,
+    valor: number,
+  ): void {
     if (quantidadeMinima < 2) {
-      throw new Error('RegraAtacado.quantidadeMinima precisa ser pelo menos 2.');
+      throw new RegraAtacadoValorInvalidoException(
+        'RegraAtacado.quantidadeMinima precisa ser pelo menos 2.',
+      );
     }
     if (tipoDesconto === 'PERCENTUAL' && (valor < 0 || valor > 100)) {
-      throw new Error('RegraAtacado percentual precisa ter valor entre 0 e 100.');
+      throw new RegraAtacadoValorInvalidoException(
+        'RegraAtacado percentual precisa ter valor entre 0 e 100.',
+      );
     }
     if (tipoDesconto === 'VALOR_FIXO' && valor < 0) {
-      throw new Error('RegraAtacado de valor fixo não pode ter valor negativo.');
+      throw new RegraAtacadoValorInvalidoException(
+        'RegraAtacado de valor fixo não pode ter valor negativo.',
+      );
     }
   }
 
